@@ -5,7 +5,9 @@ import com.velocitymanager.spigot.SpigotVManager;
 import com.velocitymanager.spigot.model.GameServer;
 import com.velocitymanager.spigot.ui.ServerActionUI;
 import com.velocitymanager.spigot.ui.ServerListUI;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -30,21 +32,17 @@ public class GuiListener implements Listener {
     public void onInventoryClick(InventoryClickEvent event) {
         String mainGuiTitle = plugin.getServerListUI().getInventoryTitle();
         String actionGuiPrefix = ServerActionUI.getInventoryTitlePrefix();
-        String clickedGuiTitle;
-        try {
-            // This is a more robust way to get the plain text from an Adventure Component title
-            clickedGuiTitle = ((TextComponent) event.getView().title()).content();
-        } catch (ClassCastException e) {
-            // The title is not a simple TextComponent, so it's not our GUI.
+        
+        Component titleComponent = event.getView().title();
+        if (!(titleComponent instanceof TextComponent)) {
             return;
         }
+        String clickedGuiTitle = ((TextComponent) titleComponent).content();
 
-        // If the title doesn't match one of our GUIs, do nothing.
         if (!clickedGuiTitle.equals(mainGuiTitle) && !clickedGuiTitle.startsWith(actionGuiPrefix)) {
             return;
         }
 
-        // It is one of our GUIs, so we MUST cancel the event to prevent item movement.
         event.setCancelled(true);
 
         if (!(event.getWhoClicked() instanceof Player)) {
@@ -54,7 +52,6 @@ public class GuiListener implements Listener {
         Player player = (Player) event.getWhoClicked();
         ItemStack clickedItem = event.getCurrentItem();
 
-        // Ignore clicks on empty slots or items without metadata
         if (clickedItem == null || clickedItem.getType() == Material.AIR || clickedItem.getItemMeta() == null) {
             return;
         }
@@ -77,6 +74,11 @@ public class GuiListener implements Listener {
                 player.closeInventory();
                 return;
             }
+            if ("create_server".equals(navAction)) {
+                player.closeInventory();
+                player.sendMessage(Component.text("Please use the web dashboard to create a new server.", NamedTextColor.GREEN));
+                return;
+            }
             if ("next_page".equals(navAction) || "prev_page".equals(navAction)) {
                 Integer page = data.get(ServerListUI.PAGE_KEY, PersistentDataType.INTEGER);
                 if (page != null) {
@@ -84,7 +86,6 @@ public class GuiListener implements Listener {
                     if (!servers.isEmpty()) {
                         plugin.getServerListUI().open(player, servers, page);
                     } else {
-                         // Fallback: refetch if cache is lost
                          player.sendPluginMessage(plugin, SpigotVManager.CHANNEL, "GET_SERVERS".getBytes(StandardCharsets.UTF_8));
                     }
                 }
@@ -92,11 +93,9 @@ public class GuiListener implements Listener {
             }
         }
         
-        // If it's a server item, open the action UI for it
         if (serverName != null) {
             Optional<GameServer> serverOpt = plugin.getServerListUI().getServerByName(serverName);
             serverOpt.ifPresent(server -> {
-                // Run on main thread to open GUI
                 plugin.getServer().getScheduler().runTask(plugin, () -> ServerActionUI.open(player, server));
             });
         }
@@ -106,7 +105,6 @@ public class GuiListener implements Listener {
         String action = data.get(ServerActionUI.ACTION_KEY, PersistentDataType.STRING);
 
         if ("back".equals(action)) {
-            // Request a fresh server list to go back to the main menu
             player.sendPluginMessage(plugin, SpigotVManager.CHANNEL, "GET_SERVERS".getBytes(StandardCharsets.UTF_8));
             return;
         }

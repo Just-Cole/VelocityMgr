@@ -76,6 +76,10 @@ public class ServerListUI {
                 inv.setItem(serverSlots[slotIndex], createServerItem(servers.get(i)));
             }
         }
+        
+        // Add create server button
+        inv.setItem(45, createNavButton(Material.CRAFTING_TABLE, "Create New Server", "create_server", 0));
+
 
         if (page > 0) {
             inv.setItem(48, createNavButton(Material.ARROW, "Previous Page", "prev_page", page - 1));
@@ -99,33 +103,39 @@ public class ServerListUI {
     }
     
     private ItemStack createServerItem(GameServer server) {
-        ItemStack item = new ItemStack(Material.ITEM_FRAME);
+        ItemStack item;
+        Component statusComponent;
+        switch (server.status().toLowerCase()) {
+            case "online":
+                item = new ItemStack(Material.LIME_STAINED_GLASS_PANE);
+                statusComponent = Component.text("Online", NamedTextColor.GREEN);
+                break;
+            case "offline":
+                 item = new ItemStack(Material.RED_STAINED_GLASS_PANE);
+                statusComponent = Component.text("Offline", NamedTextColor.RED);
+                break;
+            case "starting":
+                item = new ItemStack(Material.YELLOW_STAINED_GLASS_PANE);
+                statusComponent = Component.text("Starting", NamedTextColor.YELLOW);
+                break;
+            case "restarting":
+                item = new ItemStack(Material.ORANGE_STAINED_GLASS_PANE);
+                statusComponent = Component.text("Restarting", NamedTextColor.GOLD);
+                break;
+            case "stopping":
+                item = new ItemStack(Material.ORANGE_STAINED_GLASS_PANE);
+                statusComponent = Component.text("Stopping", NamedTextColor.GOLD);
+                break;
+            default:
+                 item = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
+                statusComponent = Component.text(server.status(), NamedTextColor.GRAY);
+                break;
+        }
+
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(Component.text(server.name(), NamedTextColor.WHITE).decoration(TextDecoration.ITALIC, false));
+            meta.displayName(Component.text(server.name(), NamedTextColor.WHITE, TextDecoration.BOLD).decoration(TextDecoration.ITALIC, false));
             
-            Component statusComponent;
-            switch (server.status().toLowerCase()) {
-                case "online":
-                    statusComponent = Component.text("Online", NamedTextColor.GREEN);
-                    break;
-                case "offline":
-                    statusComponent = Component.text("Offline", NamedTextColor.RED);
-                    break;
-                case "starting":
-                    statusComponent = Component.text("Starting", NamedTextColor.YELLOW);
-                    break;
-                case "restarting":
-                    statusComponent = Component.text("Restarting", NamedTextColor.GOLD);
-                    break;
-                case "stopping":
-                    statusComponent = Component.text("Stopping", NamedTextColor.GOLD);
-                    break;
-                default:
-                    statusComponent = Component.text(server.status(), NamedTextColor.GRAY);
-                    break;
-            }
-
             List<Component> lore = new ArrayList<>();
             lore.add(Component.text("Status: ").color(NamedTextColor.GRAY).append(statusComponent));
             lore.add(Component.text("Type: " + server.softwareType() + " " + server.serverVersion(), NamedTextColor.GRAY));
@@ -146,6 +156,13 @@ public class ServerListUI {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
         meta.displayName(Component.text(name, NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false));
+
+        if("create_server".equals(action)) {
+            List<Component> lore = new ArrayList<>();
+            lore.add(Component.text("Create a new server via the web panel.", NamedTextColor.GRAY));
+            meta.lore(lore);
+        }
+
         PersistentDataContainer data = meta.getPersistentDataContainer();
         data.set(ACTION_KEY, PersistentDataType.STRING, action);
         data.set(PAGE_KEY, PersistentDataType.INTEGER, page);
