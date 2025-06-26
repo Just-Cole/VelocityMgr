@@ -744,20 +744,26 @@ class IndexController {
             paperBuild,
             velocityBuild
         } = req.body;
-    
+
         if (!serverName || !port || !serverType || !serverVersion) {
-            return res.status(400).json({ message: "Missing required fields for server creation." });
+            return res.status(400).json({
+                message: "Missing required fields for server creation."
+            });
         }
-    
+
         try {
             let servers = this._readServers();
             if (servers.find(s => s.name.toLowerCase() === serverName.toLowerCase())) {
-                return res.status(409).json({ message: `A server with the name "${serverName}" already exists.` });
+                return res.status(409).json({
+                    message: `A server with the name "${serverName}" already exists.`
+                });
             }
-            if (servers.find(s => s.port === parseInt(port,10))) {
-                return res.status(409).json({ message: `A server is already using port ${port}.` });
+            if (servers.find(s => s.port === parseInt(port, 10))) {
+                return res.status(409).json({
+                    message: `A server is already using port ${port}.`
+                });
             }
-    
+
             const newServerId = uuidv4();
             const newServer = {
                 id: newServerId,
@@ -775,37 +781,103 @@ class IndexController {
                 maxRam: '2048M',
                 description: `A new ${serverType} server.`,
             };
-    
+
             const serverFolderPath = this._getServerFolderPath(newServer);
-            await fsPromises.mkdir(serverFolderPath, { recursive: true });
-    
+            await fsPromises.mkdir(serverFolderPath, {
+                recursive: true
+            });
+
             const isPaper = serverType === 'PaperMC';
             const apiProjectName = isPaper ? 'paper' : 'velocity';
             const buildNumber = isPaper ? paperBuild : velocityBuild;
             const downloadFileName = `${apiProjectName}-${serverVersion}-${buildNumber}.jar`;
             const serverJarPath = path.join(serverFolderPath, downloadFileName);
-    
+
             if (!fs.existsSync(serverJarPath)) {
                 const downloadUrl = `https://api.papermc.io/v2/projects/${apiProjectName}/versions/${serverVersion}/builds/${buildNumber}/downloads/${downloadFileName}`;
                 console.log(`[Create Server] JAR not found. Downloading from ${downloadUrl}`);
                 await downloadFile(downloadUrl, serverFolderPath, downloadFileName);
             }
-            
+
             newServer.jarFileName = downloadFileName;
-    
+
             const eulaPath = path.join(serverFolderPath, 'eula.txt');
             if (!fs.existsSync(eulaPath)) {
                 await fsPromises.writeFile(eulaPath, 'eula=true', 'utf-8');
             }
-    
+
             servers.push(newServer);
             this._writeServers(servers);
-    
+
+            // --- NEW LOGIC TO UPDATE PROXY CONFIG ---
+            if (newServer.softwareType === 'PaperMC') {
+                const allServers = this._readServers();
+                const proxies = allServers.filter(s => s.softwareType === 'Velocity');
+
+                if (proxies.length > 0) {
+                    const proxyServer = proxies[0]; // Assuming the first Velocity server is the main proxy
+                    const proxyPath = this._getServerFolderPath(proxyServer);
+                    const tomlPath = path.join(proxyPath, 'velocity.toml');
+
+                    try {
+                        let tomlConfig = {};
+                        if (fs.existsSync(tomlPath)) {
+                            const tomlContent = await fsPromises.readFile(tomlPath, 'utf8');
+                            tomlConfig = TOML.parse(tomlContent);
+                        } else {
+                            // Create a default velocity.toml if it doesn't exist
+                            tomlConfig = {
+                                servers: {},
+                                'online-mode': true,
+                            };
+                        }
+
+                        if (!tomlConfig.servers) {
+                            tomlConfig.servers = {};
+                        }
+
+                        // Sanitize the server name for use as a key in TOML
+                        const serverEntryName = newServer.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+                        tomlConfig.servers[serverEntryName] = `${newServer.ip}:${newServer.port}`;
+
+                        // Set the try order, adding the new server if a hub doesn't exist
+                        if (!tomlConfig.try) {
+                            tomlConfig.try = [];
+                        }
+                        if (tomlConfig.try.length === 0 && serverEntryName.includes('hub')) {
+                            tomlConfig.try.push(serverEntryName);
+                        } else if (tomlConfig.try.length === 0) {
+                            tomlConfig.try.push(serverEntryName);
+                        }
+
+
+                        await fsPromises.writeFile(tomlPath, TOML.stringify(tomlConfig), 'utf8');
+                        console.log(`[Create Server] Successfully added new server '${newServer.name}' to proxy '${proxyServer.name}' config.`);
+
+                        return res.status(201).json({
+                            message: `Server "${newServer.name}" created and linked to proxy "${proxyServer.name}". Restart the proxy to apply.`,
+                            server: newServer,
+                        });
+
+                    } catch (tomlError) {
+                        console.error(`[Create Server] Failed to update proxy config for new server:`, tomlError);
+                        return res.status(201).json({
+                            message: `Server "${newServer.name}" created, but FAILED to link to proxy. You must add it to velocity.toml manually. Error: ${tomlError.message}`,
+                            server: newServer,
+                        });
+                    }
+                } else {
+                    // No proxy found, just send the standard success message
+                    console.log(`[Create Server] New PaperMC server created, but no Velocity proxy was found to link it to.`);
+                }
+            }
+            // --- END OF NEW LOGIC ---
+
             res.status(201).json({
                 message: `Server "${newServer.name}" created successfully. You can now manage it from the dashboard.`,
                 server: newServer,
             });
-    
+
         } catch (error) {
             next(error);
         }
@@ -818,15 +890,19 @@ class IndexController {
             next(e);
         }
     }
-    
+
     async deleteServerWithRecovery(req, res, next) {
-        const { serverId } = req.params;
+        const {
+            serverId
+        } = req.params;
         try {
             const servers = this._readServers();
             const serverIndex = servers.findIndex(s => s.id === serverId);
 
             if (serverIndex === -1) {
-                return res.status(404).json({ message: 'Server not found.' });
+                return res.status(404).json({
+                    message: 'Server not found.'
+                });
             }
 
             const [server] = servers.splice(serverIndex, 1);
@@ -849,9 +925,11 @@ class IndexController {
             this._cleanupServerProcess(server.id); // Clean up active process tracking
 
             const serverPath = this._getServerFolderPath(server);
-            
+
             if (fs.existsSync(serverPath)) {
-                await fsPromises.mkdir(RECOVERY_DIR, { recursive: true });
+                await fsPromises.mkdir(RECOVERY_DIR, {
+                    recursive: true
+                });
                 const recoveryFolderName = `${sanitize(server.name)}_${Date.now()}`;
                 const recoveryDestPath = path.join(RECOVERY_DIR, recoveryFolderName);
 
@@ -881,13 +959,15 @@ class IndexController {
 
             this._writeServers(servers); // Write the updated servers list (with the server removed)
 
-            res.status(200).json({ message: `Server "${server.name}" has been successfully moved to recovery.` });
+            res.status(200).json({
+                message: `Server "${server.name}" has been successfully moved to recovery.`
+            });
 
         } catch (error) {
             next(error);
         }
     }
-    
+
     async listRecoverableServers(req, res, next) {
         try {
             const recoveryFilePath = path.join(RECOVERY_DIR, 'recovery.json');
@@ -900,24 +980,30 @@ class IndexController {
             next(error);
         }
     }
-    
+
     async restoreServer(req, res, next) {
-        const { recoveryFolderName } = req.body;
+        const {
+            recoveryFolderName
+        } = req.body;
         try {
             const recoveryFilePath = path.join(RECOVERY_DIR, 'recovery.json');
             if (!fs.existsSync(recoveryFilePath)) {
-                return res.status(404).json({ message: "Recovery data not found." });
+                return res.status(404).json({
+                    message: "Recovery data not found."
+                });
             }
 
             let recoveryData = JSON.parse(await fsPromises.readFile(recoveryFilePath, 'utf8'));
             const recoveryIndex = recoveryData.findIndex(item => item.recoveryFolderName === recoveryFolderName);
             if (recoveryIndex === -1) {
-                return res.status(404).json({ message: "Server not found in recovery data." });
+                return res.status(404).json({
+                    message: "Server not found in recovery data."
+                });
             }
 
             const [recoveryInfo] = recoveryData.splice(recoveryIndex, 1);
             const serverToRestore = recoveryInfo.server;
-            
+
             // Set status to Offline upon restore and clear runtime data
             serverToRestore.status = 'Offline';
             serverToRestore.pid = undefined;
@@ -933,15 +1019,19 @@ class IndexController {
                 // If the original path somehow exists, we can't restore over it.
                 recoveryData.push(recoveryInfo); // Put it back
                 await fsPromises.writeFile(recoveryFilePath, JSON.stringify(recoveryData, null, 2));
-                return res.status(409).json({ message: `Cannot restore: A server directory already exists at the target location: ${originalPath}` });
+                return res.status(409).json({
+                    message: `Cannot restore: A server directory already exists at the target location: ${originalPath}`
+                });
             }
 
             if (!fs.existsSync(recoveredPath)) {
                 // If folder doesn't exist, just add metadata back.
                 console.warn(`Recovered folder for ${serverToRestore.name} not found at ${recoveredPath}. Restoring metadata only.`);
-                 await fsPromises.mkdir(originalPath, { recursive: true }); // Recreate empty dir
+                await fsPromises.mkdir(originalPath, {
+                    recursive: true
+                }); // Recreate empty dir
             } else {
-                 await fsPromises.rename(recoveredPath, originalPath);
+                await fsPromises.rename(recoveredPath, originalPath);
             }
 
             const servers = this._readServers();
@@ -1011,7 +1101,7 @@ class IndexController {
     }
 
     async getBannedPlayers(req, res, next) { /* ... */ }
-    
+
     async startMinecraft(req, res, next) {
         const {
             serverName,
@@ -1221,21 +1311,27 @@ class IndexController {
         }
     }
     async stopMinecraft(req, res, next) {
-        const { serverName } = req.body;
+        const {
+            serverName
+        } = req.body;
         if (!serverName) {
-            return res.status(400).json({ message: "Server name is required." });
+            return res.status(400).json({
+                message: "Server name is required."
+            });
         }
-    
+
         try {
             let servers = this._readServers();
             const serverIndex = servers.findIndex(s => s.name === serverName);
             if (serverIndex === -1) {
-                return res.status(404).json({ message: `Server "${serverName}" not found.` });
+                return res.status(404).json({
+                    message: `Server "${serverName}" not found.`
+                });
             }
-    
+
             let server = servers[serverIndex];
             const serverProcess = this.activeServerProcesses[server.id];
-    
+
             if (!serverProcess || server.status === 'Offline') {
                 // If it's already offline, just ensure the state is consistent.
                 if (server.status !== 'Offline') {
@@ -1243,89 +1339,111 @@ class IndexController {
                     servers[serverIndex].pid = undefined;
                     this._writeServers(servers);
                 }
-                return res.status(200).json({ message: `Server "${server.name}" is already offline.` });
+                return res.status(200).json({
+                    message: `Server "${server.name}" is already offline.`
+                });
             }
-    
+
             servers[serverIndex].status = 'stopping';
             this._writeServers(servers);
-            res.status(200).json({ message: `Stopping server "${server.name}"...`, server: servers[serverIndex] });
-    
+            res.status(200).json({
+                message: `Stopping server "${server.name}"...`,
+                server: servers[serverIndex]
+            });
+
             if (serverProcess.stdin && !serverProcess.stdin.destroyed) {
                 serverProcess.stdin.write('stop\n');
             } else {
                 process.kill(serverProcess.pid, 'SIGTERM');
             }
-    
+
             setTimeout(() => {
                 const currentProcess = this.activeServerProcesses[server.id];
                 if (currentProcess) {
                     console.log(`Server ${server.name} did not stop gracefully, force killing.`);
                     try {
                         process.kill(currentProcess.pid, 'SIGKILL');
-                    } catch(e) {
+                    } catch (e) {
                         // Ignore, process might be gone
                     }
                 }
             }, 10000); // 10 seconds timeout
-    
+
         } catch (error) {
             next(error);
         }
     }
     async restartServer(req, res, next) {
-        const { serverName } = req.body;
+        const {
+            serverName
+        } = req.body;
         if (!serverName) {
-            return res.status(400).json({ message: "Server name is required." });
+            return res.status(400).json({
+                message: "Server name is required."
+            });
         }
-    
+
         try {
             let servers = this._readServers();
             const serverIndex = servers.findIndex(s => s.name === serverName);
             if (serverIndex === -1) {
-                return res.status(404).json({ message: `Server "${serverName}" not found.` });
+                return res.status(404).json({
+                    message: `Server "${serverName}" not found.`
+                });
             }
             let server = servers[serverIndex];
             const serverProcess = this.activeServerProcesses[server.id];
-    
+
             if (!serverProcess || server.status === 'Offline') {
                 console.log(`Restart called on offline server ${serverName}. Starting it.`);
                 return this.startMinecraft(req, res, next);
             }
-    
+
             servers[serverIndex].status = 'restarting';
             this._writeServers(servers);
-            res.status(200).json({ message: `Restarting server "${serverName}"...`, server: servers[serverIndex] });
-    
+            res.status(200).json({
+                message: `Restarting server "${serverName}"...`,
+                server: servers[serverIndex]
+            });
+
             const startServerLogic = async () => {
-                const fakeReq = { body: { serverName } };
-                const fakeRes = { status: () => fakeRes, json: () => {}, send: () => {} };
+                const fakeReq = {
+                    body: {
+                        serverName
+                    }
+                };
+                const fakeRes = {
+                    status: () => fakeRes,
+                    json: () => {},
+                    send: () => {}
+                };
                 const fakeNext = (err) => {
                     if (err) console.error(`Error during restart's start phase for ${serverName}:`, err);
                 };
                 await this.startMinecraft(fakeReq, fakeRes, fakeNext);
             };
-            
+
             serverProcess.once('exit', () => {
                 console.log(`Server ${server.name} stopped, now restarting.`);
                 setTimeout(startServerLogic, 2000);
             });
-    
+
             if (serverProcess.stdin && !serverProcess.stdin.destroyed) {
                 serverProcess.stdin.write('stop\n');
             } else {
                 process.kill(serverProcess.pid, 'SIGTERM');
             }
-    
+
             setTimeout(() => {
                 const currentProcess = this.activeServerProcesses[server.id];
                 if (currentProcess) {
                     console.log(`Server ${server.name} did not stop gracefully during restart, force killing.`);
                     try {
                         process.kill(currentProcess.pid, 'SIGKILL');
-                    } catch(e) {}
+                    } catch (e) {}
                 }
             }, 10000);
-    
+
         } catch (error) {
             next(error);
         }
@@ -1338,7 +1456,9 @@ class IndexController {
     async installPluginToServer(req, res, next) { /* ... */ }
     async uninstallPlugin(req, res, next) { /* ... */ }
     async updateServerSettings(req, res, next) {
-        const { serverId } = req.params;
+        const {
+            serverId
+        } = req.params;
         const updates = req.body;
 
         try {
@@ -1346,13 +1466,18 @@ class IndexController {
             const serverIndex = servers.findIndex(s => s.id === serverId);
 
             if (serverIndex === -1) {
-                return res.status(404).json({ message: 'Server not found.' });
+                return res.status(404).json({
+                    message: 'Server not found.'
+                });
             }
 
-            const originalServer = { ...servers[serverIndex] };
-            
+            const originalServer = { ...servers[serverIndex]
+            };
+
             // Merge updates into the server object
-            const updatedServer = { ...originalServer, ...updates };
+            const updatedServer = { ...originalServer,
+                ...updates
+            };
 
             // For non-proxy servers, update relevant properties in server.properties
             if (updates.port !== undefined && updates.port !== originalServer.port) {
@@ -1394,18 +1519,24 @@ class IndexController {
     }
 
     async getServerProperties(req, res, next) {
-        const { serverId } = req.params;
+        const {
+            serverId
+        } = req.params;
         try {
             const servers = this._readServers();
             const server = servers.find(s => s.id === serverId);
 
             if (!server) {
-                return res.status(404).json({ message: 'Server not found.' });
+                return res.status(404).json({
+                    message: 'Server not found.'
+                });
             }
 
             // Only applies to non-proxy servers
             if (server.softwareType === 'Velocity') {
-                return res.status(400).json({ message: 'server.properties does not apply to Velocity proxies.' });
+                return res.status(400).json({
+                    message: 'server.properties does not apply to Velocity proxies.'
+                });
             }
 
             const serverPath = this._getServerFolderPath(server);
@@ -1427,32 +1558,40 @@ class IndexController {
     }
 
     async updateServerProperties(req, res, next) {
-        const { serverId } = req.params;
+        const {
+            serverId
+        } = req.params;
         const newProperties = req.body;
         try {
             const servers = this._readServers();
             const server = servers.find(s => s.id === serverId);
 
             if (!server) {
-                return res.status(404).json({ message: 'Server not found.' });
+                return res.status(404).json({
+                    message: 'Server not found.'
+                });
             }
-             if (server.softwareType === 'Velocity') {
-                return res.status(400).json({ message: 'server.properties does not apply to Velocity proxies.' });
+            if (server.softwareType === 'Velocity') {
+                return res.status(400).json({
+                    message: 'server.properties does not apply to Velocity proxies.'
+                });
             }
 
             const serverPath = this._getServerFolderPath(server);
             const propsPath = path.join(serverPath, 'server.properties');
-            
+
             let existingContent = '';
             if (fs.existsSync(propsPath)) {
-                 existingContent = await fsPromises.readFile(propsPath, 'utf8');
+                existingContent = await fsPromises.readFile(propsPath, 'utf8');
             }
-            
+
             const newContent = formatServerProperties(newProperties, existingContent);
 
             await fsPromises.writeFile(propsPath, newContent, 'utf8');
-            
-            res.status(200).json({ message: 'server.properties updated successfully. A server restart is required for changes to take effect.' });
+
+            res.status(200).json({
+                message: 'server.properties updated successfully. A server restart is required for changes to take effect.'
+            });
 
         } catch (error) {
             next(error);
@@ -1460,13 +1599,19 @@ class IndexController {
     }
 
     async getVelocityToml(req, res, next) {
-        const { serverId } = req.params;
+        const {
+            serverId
+        } = req.params;
         try {
             const servers = this._readServers();
             const server = servers.find(s => s.id === serverId);
 
-            if (!server) return res.status(404).json({ message: 'Server not found.' });
-            if (server.softwareType !== 'Velocity') return res.status(400).json({ message: 'This is not a Velocity server.' });
+            if (!server) return res.status(404).json({
+                message: 'Server not found.'
+            });
+            if (server.softwareType !== 'Velocity') return res.status(400).json({
+                message: 'This is not a Velocity server.'
+            });
 
             const tomlPath = path.join(this._getServerFolderPath(server), 'velocity.toml');
             if (!fs.existsSync(tomlPath)) return res.status(200).json({});
@@ -1479,20 +1624,28 @@ class IndexController {
     }
 
     async updateVelocityToml(req, res, next) {
-        const { serverId } = req.params;
+        const {
+            serverId
+        } = req.params;
         const newTomlData = req.body;
         try {
             const servers = this._readServers();
             const server = servers.find(s => s.id === serverId);
 
-            if (!server) return res.status(404).json({ message: 'Server not found.' });
-            if (server.softwareType !== 'Velocity') return res.status(400).json({ message: 'This is not a Velocity server.' });
+            if (!server) return res.status(404).json({
+                message: 'Server not found.'
+            });
+            if (server.softwareType !== 'Velocity') return res.status(400).json({
+                message: 'This is not a Velocity server.'
+            });
 
             const tomlPath = path.join(this._getServerFolderPath(server), 'velocity.toml');
             const newContent = TOML.stringify(newTomlData);
             await fsPromises.writeFile(tomlPath, newContent, 'utf8');
 
-            res.status(200).json({ message: 'velocity.toml updated successfully. A proxy restart is required for changes to take effect.' });
+            res.status(200).json({
+                message: 'velocity.toml updated successfully. A proxy restart is required for changes to take effect.'
+            });
         } catch (error) {
             next(error);
         }
@@ -1500,7 +1653,9 @@ class IndexController {
 
 
     addProxy(req, res, next) {
-        res.status(501).json({ message: "Not Implemented" });
+        res.status(501).json({
+            message: "Not Implemented"
+        });
     }
     listProxies(req, res, next) {
         try {
@@ -1510,7 +1665,9 @@ class IndexController {
         }
     }
     removeProxy(req, res, next) {
-        res.status(501).json({ message: "Not Implemented" });
+        res.status(501).json({
+            message: "Not Implemented"
+        });
     }
     startProxy(req, res) {
         res.status(501).json({
@@ -1808,11 +1965,17 @@ class IndexController {
     }
 
     createFromModpack(req, res, next) {
-        const { serverName, port, modpackVersionId } = req.body;
+        const {
+            serverName,
+            port,
+            modpackVersionId
+        } = req.body;
         if (!serverName || !port || !modpackVersionId) {
-            return res.status(400).json({ message: "Missing required fields for modpack creation." });
+            return res.status(400).json({
+                message: "Missing required fields for modpack creation."
+            });
         }
-    
+
         // Fire-and-forget the background task
         this._background_createFromModpack(req.body)
             .catch(err => {
@@ -1820,7 +1983,7 @@ class IndexController {
                 // not for operational errors like download failures, which are handled inside.
                 console.error(`[FATAL] Unhandled error in _background_createFromModpack for ${serverName}:`, err);
             });
-        
+
         // Immediately respond to the client
         res.status(202).json({
             message: `Server "${serverName}" creation has been initiated. It will appear on the dashboard shortly.`
@@ -1828,15 +1991,22 @@ class IndexController {
     }
 
     async _background_createFromModpack(body) {
-        const { serverName, port, minRam, maxRam, modpackVersionId, description } = body;
+        const {
+            serverName,
+            port,
+            minRam,
+            maxRam,
+            modpackVersionId,
+            description
+        } = body;
         const newServerId = uuidv4();
         let tempExtractDir;
-    
+
         const serverPath = this._getServerFolderPath({
             id: newServerId,
             name: serverName
         });
-    
+
         const placeholderServer = {
             id: newServerId,
             name: serverName,
@@ -1851,43 +2021,49 @@ class IndexController {
             ramUsage: 0,
             currentRam: 0,
         };
-    
+
         try {
             let servers = this._readServers();
-            if (servers.find(s => s.name.toLowerCase() === serverName.toLowerCase()) || servers.find(s => s.port === parseInt(port,10))) {
+            if (servers.find(s => s.name.toLowerCase() === serverName.toLowerCase()) || servers.find(s => s.port === parseInt(port, 10))) {
                 // To avoid race conditions, do a quick check. If a server with same name/port was created
                 // between the user clicking and this background task starting, we just log and exit.
                 console.warn(`[Modrinth Create] A server with name "${serverName}" or port ${port} already exists. Aborting background creation.`);
-                return; 
+                return;
             }
             servers.push(placeholderServer);
             this._writeServers(servers);
-    
+
             console.log(`[Modrinth Create] Fetching version details for ${modpackVersionId}`);
             const versionDetails = await httpsGetJson(`https://api.modrinth.com/v2/version/${modpackVersionId}`);
             const serverFile = versionDetails.files.find(f => f.primary && f.filename.endsWith('.mrpack'));
             if (!serverFile) throw new Error("Could not find a primary server pack (.mrpack) in this version.");
-    
-            await fsPromises.mkdir(serverPath, { recursive: true });
+
+            await fsPromises.mkdir(serverPath, {
+                recursive: true
+            });
             tempExtractDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'modpack-'));
             console.log(`[Modrinth Create] Downloading ${serverFile.filename} to ${tempExtractDir}`);
             const mrpackPath = await downloadFile(serverFile.url, tempExtractDir, serverFile.filename);
-            await extract(mrpackPath, { dir: tempExtractDir });
-    
+            await extract(mrpackPath, {
+                dir: tempExtractDir
+            });
+
             const manifestPath = path.join(tempExtractDir, 'modrinth.index.json');
             const manifest = JSON.parse(await fsPromises.readFile(manifestPath, 'utf8'));
             console.log(`[Modrinth Create] Downloading ${manifest.files.length} dependency files for ${serverName}...`);
-            
+
             // Download files sequentially instead of in parallel
             for (const file of manifest.files) {
                 const targetPath = path.join(serverPath, ...file.path.split('/'));
                 const targetDir = path.dirname(targetPath);
-                await fsPromises.mkdir(targetDir, { recursive: true });
+                await fsPromises.mkdir(targetDir, {
+                    recursive: true
+                });
                 // Optional: add a small delay to be polite to the API
-                await new Promise(resolve => setTimeout(resolve, 25)); 
+                await new Promise(resolve => setTimeout(resolve, 25));
                 await downloadFile(file.downloads[0], targetDir, path.basename(file.path));
             }
-    
+
             let jarFileName;
             const isFabric = versionDetails.loaders.includes('fabric');
             if (isFabric) {
@@ -1895,11 +2071,11 @@ class IndexController {
                 const minecraftVersion = manifest.dependencies.minecraft;
                 const loaderVersion = manifest.dependencies['fabric-loader'];
                 if (!minecraftVersion || !loaderVersion) throw new Error("Could not determine Minecraft or Fabric Loader version from modpack manifest.");
-                
+
                 const fabricInstallersMeta = await httpsGetJson(`https://meta.fabricmc.net/v2/versions/installer`);
                 const latestStableInstaller = fabricInstallersMeta.find(v => v.stable === true);
                 if (!latestStableInstaller) throw new Error("Could not find a stable Fabric installer version.");
-                
+
                 const installerVersion = latestStableInstaller.version;
                 const launcherDownloadUrl = `https://meta.fabricmc.net/v2/versions/loader/${minecraftVersion}/${loaderVersion}/${installerVersion}/server/jar`;
                 jarFileName = `fabric-server-launch.jar`; // Use a consistent name
@@ -1908,7 +2084,9 @@ class IndexController {
             } else { // Handle Forge
                 const overridesDir = path.join(tempExtractDir, 'overrides');
                 if (fs.existsSync(overridesDir)) {
-                    await fsPromises.cp(overridesDir, serverPath, { recursive: true });
+                    await fsPromises.cp(overridesDir, serverPath, {
+                        recursive: true
+                    });
                 }
                 const rootFiles = await fsPromises.readdir(serverPath);
                 const startupScripts = rootFiles.filter(f => f.toLowerCase() === 'run.sh' || f.toLowerCase() === 'run.bat');
@@ -1919,12 +2097,12 @@ class IndexController {
                     const jarMatch = scriptContent.match(/forge-.*\.jar|server\.jar/);
                     if (jarMatch) detectedJar = jarMatch[0];
                 }
-                
+
                 if (!detectedJar) {
                     // Final fallback: just look for *any* .jar that isn't the installer
                     const allJars = rootFiles.filter(f => f.toLowerCase().endsWith('.jar') && !f.toLowerCase().includes('installer'));
                     if (allJars.length === 1) {
-                         detectedJar = allJars[0];
+                        detectedJar = allJars[0];
                     } else {
                         throw new Error("Could not automatically determine the main Forge server JAR file. Please check run scripts.");
                     }
@@ -1933,15 +2111,15 @@ class IndexController {
                 jarFileName = detectedJar;
             }
             console.log(`[Modrinth Create] Determined server JAR to be: ${jarFileName}`);
-    
+
             await fsPromises.writeFile(path.join(serverPath, 'eula.txt'), 'eula=true', 'utf-8');
             const consoleLogFilePath = path.join(serverPath, 'live_console.log');
             await fsPromises.writeFile(consoleLogFilePath, `--- Server ${serverName} created from Modrinth pack at ${new Date().toISOString()} ---\n`);
-    
+
             let finalServers = this._readServers();
             const serverIndex = finalServers.findIndex(s => s.id === newServerId);
             if (serverIndex !== -1) {
-                finalServers[serverIndex] = {
+                const finalServerData = {
                     ...finalServers[serverIndex],
                     jarFileName,
                     description: description || versionDetails.name || `Modpack server for ${serverName}`,
@@ -1951,10 +2129,43 @@ class IndexController {
                     logoUrl: versionDetails.project?.icon_url || null,
                     consoleLogFile: consoleLogFilePath,
                 };
+                finalServers[serverIndex] = finalServerData;
                 this._writeServers(finalServers);
                 console.log(`[Modrinth Create] Successfully created server ${serverName}`);
+
+                // Link to proxy if applicable
+                const newServer = finalServerData;
+                const allServers = this._readServers();
+                const proxies = allServers.filter(s => s.softwareType === 'Velocity');
+                if (proxies.length > 0) {
+                    const proxyServer = proxies[0];
+                    const proxyPath = this._getServerFolderPath(proxyServer);
+                    const tomlPath = path.join(proxyPath, 'velocity.toml');
+                    
+                    try {
+                        let tomlConfig = {};
+                        if (fs.existsSync(tomlPath)) {
+                            const tomlContent = await fsPromises.readFile(tomlPath, 'utf8');
+                            tomlConfig = TOML.parse(tomlContent);
+                        } else {
+                            tomlConfig = { servers: {} };
+                        }
+                        if (!tomlConfig.servers) tomlConfig.servers = {};
+            
+                        const serverEntryName = newServer.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+                        tomlConfig.servers[serverEntryName] = `${newServer.ip}:${newServer.port}`;
+                        
+                        if (!tomlConfig.try) tomlConfig.try = [];
+                        if (tomlConfig.try.length === 0) tomlConfig.try.push(serverEntryName);
+            
+                        await fsPromises.writeFile(tomlPath, TOML.stringify(tomlConfig), 'utf8');
+                        console.log(`[Modrinth Create] Successfully added new modpack server '${newServer.name}' to proxy '${proxyServer.name}' config.`);
+                    } catch (tomlError) {
+                         console.error(`[Modrinth Create] Failed to update proxy config for new modpack server:`, tomlError);
+                    }
+                }
             }
-    
+
         } catch (error) {
             console.error(`Error during background modpack creation for ${serverName}:`, error);
             let finalServers = this._readServers();
@@ -1966,7 +2177,10 @@ class IndexController {
             }
         } finally {
             if (tempExtractDir) {
-                await fsPromises.rm(tempExtractDir, { recursive: true, force: true }).catch(e => console.error("Failed to cleanup temp modpack dir:", e));
+                await fsPromises.rm(tempExtractDir, {
+                    recursive: true,
+                    force: true
+                }).catch(e => console.error("Failed to cleanup temp modpack dir:", e));
             }
         }
     }
@@ -1974,9 +2188,13 @@ class IndexController {
     // --- NEW PAPERTMC API METHODS ---
 
     async getPaperMCVersions(req, res, next) {
-        const { project } = req.params; // 'paper' or 'velocity'
+        const {
+            project
+        } = req.params; // 'paper' or 'velocity'
         if (!['paper', 'velocity'].includes(project)) {
-            return res.status(400).json({ message: 'Invalid project specified.' });
+            return res.status(400).json({
+                message: 'Invalid project specified.'
+            });
         }
         const url = `https://api.papermc.io/v2/projects/${project}`;
 
@@ -1991,12 +2209,17 @@ class IndexController {
     }
 
     async getPaperMCBuilds(req, res, next) {
-        const { project, version } = req.params;
+        const {
+            project,
+            version
+        } = req.params;
         if (!['paper', 'velocity'].includes(project)) {
-            return res.status(400).json({ message: 'Invalid project specified.' });
+            return res.status(400).json({
+                message: 'Invalid project specified.'
+            });
         }
         const url = `https://api.papermc.io/v2/projects/${project}/versions/${version}/builds`;
-        
+
         try {
             const data = await httpsGetJson(url);
             res.status(200).json(data);
@@ -2049,6 +2272,3 @@ try {
 }
 
 module.exports = IndexController;
-
-    
-
