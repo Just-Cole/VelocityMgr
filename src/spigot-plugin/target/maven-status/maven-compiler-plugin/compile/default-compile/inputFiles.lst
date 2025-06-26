@@ -1,0 +1,7 @@
+/home/user/studio/src/spigot-plugin/src/main/java/com/velocitymanager/spigot/SpigotVManager.java
+/home/user/studio/src/spigot-plugin/src/main/java/com/velocitymanager/spigot/ui/ServerListUI.java
+/home/user/studio/src/spigot-plugin/src/main/java/com/velocitymanager/spigot/model/GameServer.java
+/home/user/studio/src/spigot-plugin/src/main/java/com/velocitymanager/spigot/listeners/PluginMessageListener.java
+/home/user/studio/src/spigot-plugin/src/main/java/com/velocitymanager/spigot/listeners/GuiListener.java
+/home/user/studio/src/spigot-plugin/src/main/java/com/velocitymanager/spigot/commands/ManageGuiCommand.java
+/home/user/studio/src/spigot-plugin/src/main/java/com/velocitymanager/spigot/ui/ServerActionUI.java

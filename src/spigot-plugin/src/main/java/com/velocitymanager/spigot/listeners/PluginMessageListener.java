@@ -7,13 +7,12 @@ import com.velocitymanager.spigot.model.GameServer;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.messaging.PluginMessageListener as BukkitPluginMessageListener;
 import org.jetbrains.annotations.NotNull;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
-public class PluginMessageListener implements BukkitPluginMessageListener {
+public class PluginMessageListener implements org.bukkit.plugin.messaging.PluginMessageListener {
     private final SpigotVManager plugin;
     private final Gson gson = new Gson();
 
