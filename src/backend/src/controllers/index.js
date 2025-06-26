@@ -812,10 +812,9 @@ class IndexController {
             // --- NEW LOGIC TO UPDATE PROXY CONFIG ---
             if (newServer.softwareType === 'PaperMC') {
                 const allServers = this._readServers();
-                const proxies = allServers.filter(s => s.softwareType === 'Velocity');
+                const proxyServer = allServers.find(s => s.softwareType === 'Velocity');
 
-                if (proxies.length > 0) {
-                    const proxyServer = proxies[0]; // Assuming the first Velocity server is the main proxy
+                if (proxyServer) {
                     const proxyPath = this._getServerFolderPath(proxyServer);
                     const tomlPath = path.join(proxyPath, 'velocity.toml');
 
@@ -853,9 +852,12 @@ class IndexController {
 
                         await fsPromises.writeFile(tomlPath, TOML.stringify(tomlConfig), 'utf8');
                         console.log(`[Create Server] Successfully added new server '${newServer.name}' to proxy '${proxyServer.name}' config.`);
+                        
+                        // Sync the forwarding secret
+                        await this._syncVelocitySecret(newServer, proxyServer);
 
                         return res.status(201).json({
-                            message: `Server "${newServer.name}" created and linked to proxy "${proxyServer.name}". Restart the proxy to apply.`,
+                            message: `Server "${newServer.name}" created, linked to proxy, and forwarding secret synced. Restart the proxy to apply.`,
                             server: newServer,
                         });
 
@@ -2227,6 +2229,61 @@ class IndexController {
             console.error(`Error fetching PaperMC builds for ${project} v${version}:`, error);
             error.message = `Failed to fetch builds from PaperMC API for ${project} v${version}. ${error.message}`;
             next(error);
+        }
+    }
+
+    async _syncVelocitySecret(paperServer, velocityProxy) {
+        console.log(`[Secret Sync] Starting secret sync for ${paperServer.name} with proxy ${velocityProxy.name}.`);
+        const proxyPath = this._getServerFolderPath(velocityProxy);
+        const paperServerPath = this._getServerFolderPath(paperServer);
+    
+        if (!proxyPath || !paperServerPath) {
+            console.error(`[Secret Sync] Could not determine folder path for server or proxy.`);
+            return;
+        }
+    
+        const secretFilePath = path.join(proxyPath, 'forwarding.secret');
+        let secret = '';
+    
+        try {
+            if (fs.existsSync(secretFilePath)) {
+                secret = await fsPromises.readFile(secretFilePath, 'utf-8');
+            } else {
+                secret = crypto.randomBytes(12).toString('hex'); // Generate a new secret
+                await fsPromises.writeFile(secretFilePath, secret, 'utf-8');
+                console.log(`[Secret Sync] Generated new forwarding.secret for proxy ${velocityProxy.name}.`);
+            }
+            secret = secret.trim();
+    
+            const paperConfigDir = path.join(paperServerPath, 'config');
+            const paperGlobalYmlPath = path.join(paperConfigDir, 'paper-global.yml');
+    
+            await fsPromises.mkdir(paperConfigDir, { recursive: true });
+    
+            const defaultConfig = `
+# This is the global configuration file for Paper.
+# As you can see, there's not much here. This is because Paper ships
+# with a default configuration file, and it is not recommended to copy
+# and edit it. It's better to only override the settings you want to change.
+#
+# You can find the full list of configuration options here:
+# https://docs.papermc.io/paper/configuration
+
+proxies:
+  bungee-cord:
+    online-mode: true
+  proxy-protocol: false
+  velocity:
+    enabled: true
+    online-mode: true
+    secret: "${secret}"
+`;
+    
+            await fsPromises.writeFile(paperGlobalYmlPath, defaultConfig.trim(), 'utf-8');
+            console.log(`[Secret Sync] Successfully wrote forwarding secret to ${paperServer.name}'s paper-global.yml.`);
+    
+        } catch (error) {
+            console.error(`[Secret Sync] Failed to sync Velocity secret for server ${paperServer.name}:`, error);
         }
     }
 }
