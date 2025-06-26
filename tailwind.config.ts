@@ -12,15 +12,7 @@ export default {
       fontFamily: {
         body: ['Inter', 'sans-serif'],
         headline: ['Inter', 'sans-serif'],
-<<<<<<< HEAD
-<<<<<<< HEAD
         code: ['Source Code Pro', 'monospace'],
-=======
-        code: ['monospace'],
->>>>>>> 73da13e (initial scaffold)
-=======
-        code: ['Source Code Pro', 'monospace'],
->>>>>>> e06a37c (vv)
       },
       colors: {
         background: 'hsl(var(--background))',
