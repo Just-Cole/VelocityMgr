@@ -11,12 +11,19 @@ import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.ServerConnection;
 import com.velocitypowered.api.proxy.messages.ChannelIdentifier;
 import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
+import com.velocitypowered.api.proxy.server.RegisteredServer;
+import com.velocitypowered.api.proxy.server.ServerInfo;
 import com.velocitymanager.plugin.command.ManageCommand;
 import com.velocitymanager.plugin.model.GameServer;
 import com.velocitymanager.plugin.service.ApiService;
 import org.slf4j.Logger;
 
+import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 /**
  * Main class for the Velocity Manager in-game plugin.
@@ -133,10 +140,27 @@ public class VelocityManagerPlugin {
 
     private void handleCreateServer(ServerConnection source, String jsonPayload) {
         apiService.createServer(jsonPayload)
-            .thenAccept(responseMsg -> {
+            .thenAccept(actionResponse -> {
                 server.getScheduler().buildTask(this, () -> {
-                    String message = "CREATION_RESPONSE:success:" + responseMsg;
+                    String message = "CREATION_RESPONSE:success:" + actionResponse.message();
                     source.sendPluginMessage(channelIdentifier, message.getBytes(StandardCharsets.UTF_8));
+
+                    // Live register the new server
+                    GameServer newServer = actionResponse.server();
+                    if (newServer != null) {
+                        logger.info("Registering newly created server '" + newServer.name() + "' with Velocity.");
+                        InetSocketAddress address = new InetSocketAddress(newServer.ip(), newServer.port());
+                        ServerInfo serverInfo = new ServerInfo(newServer.name(), address);
+
+                        if (!server.getServer(newServer.name()).isPresent()) {
+                            server.registerServer(serverInfo);
+                            logger.info("Server '" + newServer.name() + "' registered successfully.");
+                        } else {
+                            logger.warn("Server '" + newServer.name() + "' was already registered. Skipping live registration.");
+                        }
+                    } else {
+                        logger.error("Backend did not return new server info after creation. Cannot register live.");
+                    }
                 }).schedule();
             })
             .exceptionally(ex -> {
@@ -146,6 +170,47 @@ public class VelocityManagerPlugin {
                 }).schedule();
                 return null;
             });
+    }
+
+    public static class ReloadResult {
+        public int added = 0;
+        public int removed = 0;
+    }
+
+    public CompletableFuture<ReloadResult> reloadServersFromConfig() {
+        return apiService.fetchServers().thenApply(serversFromApi -> {
+            ReloadResult result = new ReloadResult();
+
+            Collection<RegisteredServer> registeredServers = server.getAllServers();
+            Set<String> registeredServerNames = registeredServers.stream()
+                .map(s -> s.getServerInfo().getName())
+                .collect(Collectors.toSet());
+
+            Set<String> configServerNames = serversFromApi.stream()
+                .map(GameServer::name)
+                .collect(Collectors.toSet());
+
+            for (RegisteredServer registeredServer : registeredServers) {
+                String serverName = registeredServer.getServerInfo().getName();
+                if (!configServerNames.contains(serverName)) {
+                    server.unregisterServer(registeredServer.getServerInfo());
+                    logger.info("Unregistered server '" + serverName + "' as it's no longer in the config.");
+                    result.removed++;
+                }
+            }
+
+            for (GameServer serverFromApi : serversFromApi) {
+                if (!registeredServerNames.contains(serverFromApi.name())) {
+                    InetSocketAddress address = new InetSocketAddress(serverFromApi.ip(), serverFromApi.port());
+                    ServerInfo serverInfo = new ServerInfo(serverFromApi.name(), address);
+                    server.registerServer(serverInfo);
+                    logger.info("Registered new server '" + serverFromApi.name() + "' from config reload.");
+                    result.added++;
+                }
+            }
+            
+            return result;
+        });
     }
 
     public ProxyServer getProxyServer() {

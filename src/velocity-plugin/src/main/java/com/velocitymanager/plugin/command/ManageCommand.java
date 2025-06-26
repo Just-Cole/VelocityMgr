@@ -39,8 +39,14 @@ public class ManageCommand implements SimpleCommand {
         }
 
         String action = args[0].toLowerCase();
+
+        if (action.equals("reload")) {
+            handleReload(player);
+            return;
+        }
+
         if (!(action.equals("start") || action.equals("stop") || action.equals("restart"))) {
-            player.sendMessage(Component.text("Invalid action. Usage: /vmanage <start|stop|restart> <server_name>", NamedTextColor.RED));
+            player.sendMessage(Component.text("Invalid action. Usage: /vmanage <start|stop|restart|reload> [server_name]", NamedTextColor.RED));
             return;
         }
 
@@ -144,6 +150,20 @@ public class ManageCommand implements SimpleCommand {
         });
     }
 
+    private void handleReload(Player player) {
+        player.sendMessage(Component.text("Requesting proxy to reload its server list from the main config...", NamedTextColor.GRAY));
+        plugin.reloadServersFromConfig().thenAccept(result -> {
+            plugin.getProxyServer().getScheduler().buildTask(plugin, () -> {
+                player.sendMessage(Component.text("Reload complete. Added " + result.added + " servers, removed " + result.removed + " servers.", NamedTextColor.GREEN));
+            }).schedule();
+        }).exceptionally(ex -> {
+            plugin.getProxyServer().getScheduler().buildTask(plugin, () -> {
+                player.sendMessage(Component.text("Reload failed: " + ex.getMessage(), NamedTextColor.RED));
+            }).schedule();
+            return null;
+        });
+    }
+
     @Override
     public boolean hasPermission(final Invocation invocation) {
         return invocation.source().hasPermission("velocitymanager.manage");
@@ -159,7 +179,7 @@ public class ManageCommand implements SimpleCommand {
         
         if (args.length <= 1) {
             return CompletableFuture.completedFuture(
-                List.of("start", "stop", "restart").stream()
+                List.of("start", "stop", "restart", "reload").stream()
                     .filter(s -> s.startsWith(args.length == 1 ? args[0].toLowerCase() : ""))
                     .collect(Collectors.toList())
             );

@@ -33,24 +33,24 @@ public class ApiService {
 
     public CompletableFuture<String> performServerAction(GameServer server, String action) {
         String jsonBody = gson.toJson(new ServerActionPayload(server.name(), server.serverVersion(), server.softwareType()));
-        return postToActionEndpoint("/minecraft/" + action, jsonBody);
+        return postToActionEndpoint("/minecraft/" + action, jsonBody).thenApply(ActionResponse::message);
     }
     
-    public CompletableFuture<String> createServer(String jsonPayload) {
+    public CompletableFuture<ActionResponse> createServer(String jsonPayload) {
         return postToActionEndpoint("/minecraft/servers", jsonPayload);
     }
 
-    private CompletableFuture<String> postToActionEndpoint(String path, String jsonBody) {
-        CompletableFuture<String> future = new CompletableFuture<>();
+    private CompletableFuture<ActionResponse> postToActionEndpoint(String path, String jsonBody) {
+        CompletableFuture<ActionResponse> future = new CompletableFuture<>();
         RequestBody body = RequestBody.create(jsonBody, MediaType.get("application/json; charset=utf-8"));
         Request request = new Request.Builder().url(baseUrl + path).post(body).build();
-        client.newCall(request).enqueue(new ApiCallback<>(future, ActionResponse.class, gson, true));
+        client.newCall(request).enqueue(new ApiCallback<>(future, ActionResponse.class, gson));
         return future;
     }
 
     // --- DTOs for API Payloads and Responses ---
     private record ServerActionPayload(String serverName, String serverVersion, String serverType) {}
-    private record ActionResponse(String message, GameServer server) {}
+    public record ActionResponse(String message, GameServer server) {}
     private record ErrorResponse(String message) {}
     
     // Generic Callback Handler
@@ -58,17 +58,11 @@ public class ApiService {
         private final CompletableFuture<T> future;
         private final Type type;
         private final Gson gson;
-        private final boolean isActionResponse;
 
-        ApiCallback(CompletableFuture<T> future, Type type, Gson gson, boolean isActionResponse) {
+        ApiCallback(CompletableFuture<T> future, Type type, Gson gson) {
             this.future = future;
             this.type = type;
             this.gson = gson;
-            this.isActionResponse = isActionResponse;
-        }
-
-        ApiCallback(CompletableFuture<T> future, Type type, Gson gson) {
-            this(future, type, gson, false);
         }
 
         @Override
@@ -93,12 +87,7 @@ public class ApiService {
                     }
                 } else {
                     try {
-                        if (isActionResponse) {
-                            ActionResponse actionResponse = gson.fromJson(bodyString, ActionResponse.class);
-                            future.complete((T) actionResponse.message());
-                        } else {
-                            future.complete(gson.fromJson(bodyString, type));
-                        }
+                        future.complete(gson.fromJson(bodyString, type));
                     } catch (Exception e) {
                         future.completeExceptionally(new IOException("Failed to parse response: " + bodyString, e));
                     }
