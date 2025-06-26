@@ -1163,7 +1163,7 @@ class IndexController {
 
             if (this.activeServerProcesses[server.id]) {
                 return res.status(409).json({
-                    message: `Server "${server.name}" is already running or in a transitional state.`
+                    message: `Server "${serverName}" is already running or in a transitional state.`
                 });
             }
 
@@ -1173,6 +1173,32 @@ class IndexController {
                     recursive: true
                 });
             }
+
+            // --- Add companion plugin on start if missing ---
+            let pluginJarName, pluginSrcPath;
+            if (server.softwareType === 'PaperMC') {
+                pluginJarName = 'spigot-vmanager-plugin-1.0.0.jar';
+                pluginSrcPath = path.join(__dirname, '..', '..', '..', 'spigot-plugin', 'target', pluginJarName);
+            } else if (server.softwareType === 'Velocity') {
+                pluginJarName = 'velocity-manager-plugin-1.0.0.jar';
+                pluginSrcPath = path.join(__dirname, '..', '..', '..', 'velocity-plugin', 'target', pluginJarName);
+            }
+
+            if (pluginJarName && pluginSrcPath) {
+                if (fs.existsSync(pluginSrcPath)) {
+                    const pluginsDestDir = path.join(serverFolderPath, 'plugins');
+                    await fsPromises.mkdir(pluginsDestDir, { recursive: true });
+                    const pluginDestPath = path.join(pluginsDestDir, pluginJarName);
+                    
+                    if (!fs.existsSync(pluginDestPath)) {
+                         await fsPromises.copyFile(pluginSrcPath, pluginDestPath);
+                         console.log(`[Start Server Check] Added missing companion plugin '${pluginJarName}' to server '${server.name}'.`);
+                    }
+                } else {
+                    console.warn(`[Start Server Check] Companion plugin source JAR not found at ${pluginSrcPath}. It cannot be automatically installed.`);
+                }
+            }
+            // --- End plugin add ---
 
             // This block handles cases where the JAR might be missing for simple server types
             const serverJarPath = server.jarFileName ? path.join(serverFolderPath, server.jarFileName) : null;
@@ -1314,10 +1340,8 @@ class IndexController {
 
                 const currentServer = servers[serverIndex];
 
-                if (currentServer.status === 'restarting') {
-                    console.log(`Exit detected for restarting server ${server.name}. Restart logic will take over.`);
-                } else if (currentServer.status === 'stopping') {
-                    console.log(`Exit detected for stopping server ${server.name}. Setting status to Offline.`);
+                if (currentServer.status === 'restarting' || currentServer.status === 'stopping') {
+                    console.log(`Exit detected for a managed shutdown of server ${server.name}. Setting status to Offline.`);
                     servers[serverIndex].status = 'Offline';
                     this._writeServers(servers);
                 } else {
