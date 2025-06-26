@@ -818,6 +818,11 @@ class IndexController {
                 await fsPromises.writeFile(eulaPath, 'eula=true', 'utf-8');
             }
 
+            // Explicitly set the port in server.properties
+            if (newServer.softwareType === 'PaperMC') {
+                await this._updateServerPropertiesPort(newServer, newServer.port);
+            }
+
             servers.push(newServer);
             this._writeServers(servers);
 
@@ -1121,7 +1126,7 @@ class IndexController {
 
     async startMinecraft(req, res, next) {
         const {
-            serverName,
+            serverName
         } = req.body;
         if (!serverName) {
             return res.status(400).json({
@@ -1419,7 +1424,7 @@ class IndexController {
             servers[serverIndex].status = 'restarting';
             this._writeServers(servers);
             res.status(200).json({
-                message: `Restarting server "${serverName}"...`,
+                message: `Restarting server "${server.name}"...`,
                 server: servers[serverIndex]
             });
 
