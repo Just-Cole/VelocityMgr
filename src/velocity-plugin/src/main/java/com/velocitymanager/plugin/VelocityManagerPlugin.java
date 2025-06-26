@@ -95,18 +95,20 @@ public class VelocityManagerPlugin {
     }
 
     private void handleGetServers(ServerConnection source) {
-        apiService.fetchServers().thenAcceptAsync(servers -> {
-            String json = gson.toJson(servers);
-            String responseMessage = "SERVERS:" + json;
-            source.sendPluginMessage(channelIdentifier, responseMessage.getBytes(StandardCharsets.UTF_8));
-        }, server.getScheduler().createExecutor(this)).exceptionally(ex -> {
+        apiService.fetchServers().thenAccept(servers -> {
+            server.getScheduler().buildTask(this, () -> {
+                String json = gson.toJson(servers);
+                String responseMessage = "SERVERS:" + json;
+                source.sendPluginMessage(channelIdentifier, responseMessage.getBytes(StandardCharsets.UTF_8));
+            }).schedule();
+        }).exceptionally(ex -> {
             logger.error("Failed to fetch servers for backend request.", ex);
             return null;
         });
     }
 
     private void handleServerAction(ServerConnection source, String action, String serverName) {
-        apiService.fetchServers().thenAcceptAsync(servers -> {
+        apiService.fetchServers().thenAccept(servers -> {
             GameServer targetServer = servers.stream()
                 .filter(s -> s.name().equalsIgnoreCase(serverName))
                 .findFirst()
@@ -115,19 +117,25 @@ public class VelocityManagerPlugin {
             if (targetServer != null) {
                 apiService.performServerAction(targetServer, action)
                     .thenAccept(responseMsg -> {
-                        String message = "ACTION_RESPONSE:success:" + responseMsg;
-                        source.sendPluginMessage(channelIdentifier, message.getBytes(StandardCharsets.UTF_8));
+                        server.getScheduler().buildTask(this, () -> {
+                            String message = "ACTION_RESPONSE:success:" + responseMsg;
+                            source.sendPluginMessage(channelIdentifier, message.getBytes(StandardCharsets.UTF_8));
+                        }).schedule();
                     })
                     .exceptionally(ex -> {
-                        String errorMsg = "ACTION_RESPONSE:error:Failed to " + action + " server: " + ex.getCause().getMessage();
-                        source.sendPluginMessage(channelIdentifier, errorMsg.getBytes(StandardCharsets.UTF_8));
+                        server.getScheduler().buildTask(this, () -> {
+                            String errorMsg = "ACTION_RESPONSE:error:Failed to " + action + " server: " + ex.getCause().getMessage();
+                            source.sendPluginMessage(channelIdentifier, errorMsg.getBytes(StandardCharsets.UTF_8));
+                        }).schedule();
                         return null;
                     });
             } else {
-                 String errorMsg = "ACTION_RESPONSE:error:Server '" + serverName + "' not found.";
-                 source.sendPluginMessage(channelIdentifier, errorMsg.getBytes(StandardCharsets.UTF_8));
+                 server.getScheduler().buildTask(this, () -> {
+                    String errorMsg = "ACTION_RESPONSE:error:Server '" + serverName + "' not found.";
+                    source.sendPluginMessage(channelIdentifier, errorMsg.getBytes(StandardCharsets.UTF_8));
+                 }).schedule();
             }
-        }, server.getScheduler().createExecutor(this));
+        });
     }
 
     public ProxyServer getProxyServer() {

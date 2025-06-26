@@ -63,32 +63,36 @@ public class ManageCommand implements SimpleCommand {
 
     private void listServers(Player player) {
         player.sendMessage(Component.text("Fetching server list...", NamedTextColor.GRAY));
-        plugin.getApiService().fetchServers().thenAcceptAsync(servers -> {
-            player.sendMessage(Component.text("--- Available Servers ---", NamedTextColor.GOLD).decoration(TextDecoration.BOLD, true));
-            if (servers.isEmpty()) {
-                player.sendMessage(Component.text("No servers found.", NamedTextColor.GRAY));
-                return;
-            }
-            for (GameServer server : servers) {
-                Component serverLine = Component.text()
-                        .append(Component.text(server.name(), NamedTextColor.WHITE))
-                        .append(Component.text(" (" + server.status() + ") - ", NamedTextColor.GRAY))
-                        .append(Component.text("[Start]", NamedTextColor.GREEN, TextDecoration.BOLD)
-                                .hoverEvent(Component.text("Click to start " + server.name()))
-                                .clickEvent(ClickEvent.runCommand("/vmanage start " + server.name())))
-                        .append(Component.text(" "))
-                        .append(Component.text("[Stop]", NamedTextColor.RED, TextDecoration.BOLD)
-                                .hoverEvent(Component.text("Click to stop " + server.name()))
-                                .clickEvent(ClickEvent.runCommand("/vmanage stop " + server.name())))
-                        .append(Component.text(" "))
-                        .append(Component.text("[Restart]", NamedTextColor.YELLOW, TextDecoration.BOLD)
-                                .hoverEvent(Component.text("Click to restart " + server.name()))
-                                .clickEvent(ClickEvent.runCommand("/vmanage restart " + server.name())))
-                        .build();
-                player.sendMessage(serverLine);
-            }
-        }, plugin.getProxyServer().getScheduler().createExecutor(plugin)).exceptionally(ex -> {
-            player.sendMessage(Component.text("Failed to fetch server list: " + ex.getMessage(), NamedTextColor.RED));
+        plugin.getApiService().fetchServers().thenAccept(servers -> {
+            plugin.getProxyServer().getScheduler().buildTask(plugin, () -> {
+                player.sendMessage(Component.text("--- Available Servers ---", NamedTextColor.GOLD).decoration(TextDecoration.BOLD, true));
+                if (servers.isEmpty()) {
+                    player.sendMessage(Component.text("No servers found.", NamedTextColor.GRAY));
+                    return;
+                }
+                for (GameServer server : servers) {
+                    Component serverLine = Component.text()
+                            .append(Component.text(server.name(), NamedTextColor.WHITE))
+                            .append(Component.text(" (" + server.status() + ") - ", NamedTextColor.GRAY))
+                            .append(Component.text("[Start]", NamedTextColor.GREEN, TextDecoration.BOLD)
+                                    .hoverEvent(Component.text("Click to start " + server.name()))
+                                    .clickEvent(ClickEvent.runCommand("/vmanage start " + server.name())))
+                            .append(Component.text(" "))
+                            .append(Component.text("[Stop]", NamedTextColor.RED, TextDecoration.BOLD)
+                                    .hoverEvent(Component.text("Click to stop " + server.name()))
+                                    .clickEvent(ClickEvent.runCommand("/vmanage stop " + server.name())))
+                            .append(Component.text(" "))
+                            .append(Component.text("[Restart]", NamedTextColor.YELLOW, TextDecoration.BOLD)
+                                    .hoverEvent(Component.text("Click to restart " + server.name()))
+                                    .clickEvent(ClickEvent.runCommand("/vmanage restart " + server.name())))
+                            .build();
+                    player.sendMessage(serverLine);
+                }
+            }).schedule();
+        }).exceptionally(ex -> {
+            plugin.getProxyServer().getScheduler().buildTask(plugin, () -> {
+                 player.sendMessage(Component.text("Failed to fetch server list: " + ex.getMessage(), NamedTextColor.RED));
+            }).schedule();
             plugin.getLogger().error("Failed to fetch server list", ex);
             return null;
         });
@@ -96,38 +100,46 @@ public class ManageCommand implements SimpleCommand {
 
     private void handleServerAction(Player player, String serverName, String action, boolean isConfirmed) {
         player.sendMessage(Component.text("Requesting to " + action + " server '" + serverName + "'...", NamedTextColor.GRAY));
-        plugin.getApiService().fetchServers().thenAcceptAsync(servers -> {
+        plugin.getApiService().fetchServers().thenAccept(servers -> {
             GameServer targetServer = servers.stream()
                     .filter(s -> s.name().equalsIgnoreCase(serverName))
                     .findFirst()
                     .orElse(null);
 
             if (targetServer == null) {
-                player.sendMessage(Component.text("Server '" + serverName + "' not found.", NamedTextColor.RED));
+                plugin.getProxyServer().getScheduler().buildTask(plugin, () -> {
+                    player.sendMessage(Component.text("Server '" + serverName + "' not found.", NamedTextColor.RED));
+                }).schedule();
                 return;
             }
             
-            // Safety check for stopping/restarting the current proxy
             int currentProxyPort = plugin.getProxyServer().getBoundAddress().getPort();
             if (targetServer.port() == currentProxyPort && (action.equals("stop") || action.equals("restart")) && !isConfirmed) {
-                player.sendMessage(Component.text("Warning: You are trying to " + action + " the proxy you are connected to.", NamedTextColor.YELLOW));
-                player.sendMessage(Component.text("This will disconnect all players. To proceed, run this command again with --confirm at the end, or click here: ", NamedTextColor.YELLOW)
-                        .append(Component.text("/vmanage " + action + " " + serverName + " --confirm", NamedTextColor.RED)
-                                .clickEvent(ClickEvent.suggestCommand("/vmanage " + action + " " + serverName + " --confirm"))
-                        )
-                );
+                 plugin.getProxyServer().getScheduler().buildTask(plugin, () -> {
+                    player.sendMessage(Component.text("Warning: You are trying to " + action + " the proxy you are connected to.", NamedTextColor.YELLOW));
+                    player.sendMessage(Component.text("This will disconnect all players. To proceed, run this command again with --confirm at the end, or click here: ", NamedTextColor.YELLOW)
+                            .append(Component.text("/vmanage " + action + " " + serverName + " --confirm", NamedTextColor.RED)
+                                    .clickEvent(ClickEvent.suggestCommand("/vmanage " + action + " " + serverName + " --confirm"))
+                            )
+                    );
+                 }).schedule();
                 return;
             }
 
-
             plugin.getApiService().performServerAction(targetServer, action).thenAccept(responseMessage -> {
-                player.sendMessage(Component.text(responseMessage, NamedTextColor.GREEN));
+                 plugin.getProxyServer().getScheduler().buildTask(plugin, () -> {
+                    player.sendMessage(Component.text(responseMessage, NamedTextColor.GREEN));
+                 }).schedule();
             }).exceptionally(ex -> {
-                player.sendMessage(Component.text("Failed to " + action + " server: " + ex.getCause().getMessage(), NamedTextColor.RED));
+                 plugin.getProxyServer().getScheduler().buildTask(plugin, () -> {
+                    player.sendMessage(Component.text("Failed to " + action + " server: " + ex.getCause().getMessage(), NamedTextColor.RED));
+                 }).schedule();
                 return null;
             });
-        }, plugin.getProxyServer().getScheduler().createExecutor(plugin)).exceptionally(ex -> {
-             player.sendMessage(Component.text("Error finding server: " + ex.getMessage(), NamedTextColor.RED));
+        }).exceptionally(ex -> {
+             plugin.getProxyServer().getScheduler().buildTask(plugin, () -> {
+                player.sendMessage(Component.text("Error finding server: " + ex.getMessage(), NamedTextColor.RED));
+             }).schedule();
              return null;
         });
     }
@@ -141,12 +153,10 @@ public class ManageCommand implements SimpleCommand {
     public CompletableFuture<List<String>> suggestAsync(final Invocation invocation) {
         String[] args = invocation.arguments();
         
-        // If --confirm is the last argument, don't suggest anything further.
         if (args.length > 1 && args[args.length - 1].equalsIgnoreCase("--confirm")) {
             return CompletableFuture.completedFuture(java.util.Collections.emptyList());
         }
         
-        // Suggest actions: start, stop, restart
         if (args.length <= 1) {
             return CompletableFuture.completedFuture(
                 List.of("start", "stop", "restart").stream()
@@ -155,7 +165,6 @@ public class ManageCommand implements SimpleCommand {
             );
         }
         
-        // Suggest server names for the selected action
         if (args.length >= 2) {
              String action = args[0].toLowerCase();
              if (List.of("start", "stop", "restart").contains(action)) {
