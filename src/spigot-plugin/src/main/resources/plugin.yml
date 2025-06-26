@@ -1,0 +1,15 @@
+name: SpigotVManager
+version: ${project.version}
+main: com.velocitymanager.spigot.SpigotVManager
+api-version: '1.20'
+description: GUI companion for the Velocity Manager plugin.
+authors: [VelocityManager]
+commands:
+  vmanagegui:
+    description: Opens the Velocity server management GUI.
+    usage: /vmanagegui
+    permission: velocitymanager.gui
+permissions:
+  velocitymanager.gui:
+    description: Allows access to the /vmanagegui command.
+    default: op
