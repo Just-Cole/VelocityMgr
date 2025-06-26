@@ -1,12 +1,1 @@
-{
-  "id": "velocitymanagerplugin",
-  "name": "VelocityManagerPlugin",
-  "version": "1.0.0",
-  "description": "In-game GUI for Velocity Manager",
-  "url": "http://localhost:4000",
-  "authors": [
-    "VelocityManager"
-  ],
-  "dependencies": [],
-  "main": "com.velocitymanager.plugin.VelocityManagerPlugin"
-}
+{"id":"velocitymanagerplugin","name":"VelocityManagerPlugin","version":"1.0.0","description":"In-game GUI for Velocity Manager","authors":["VelocityManager"],"dependencies":[],"main":"com.velocitymanager.plugin.VelocityManagerPlugin"}
