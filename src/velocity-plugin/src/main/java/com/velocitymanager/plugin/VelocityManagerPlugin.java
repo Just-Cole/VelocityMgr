@@ -15,7 +15,7 @@ import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
 import com.velocitymanager.plugin.command.ManageCommand;
 import com.velocitymanager.plugin.model.GameServer;
 import com.velocitymanager.plugin.service.ApiService;
-import com.velocitymanager.plugin.lib.gson.Gson;
+import com.google.gson.Gson;
 import org.slf4j.Logger;
 
 import java.nio.charset.StandardCharsets;

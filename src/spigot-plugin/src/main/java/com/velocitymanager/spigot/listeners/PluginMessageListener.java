@@ -1,8 +1,8 @@
 package com.velocitymanager.spigot.listeners;
 
 import com.velocitymanager.spigot.SpigotVManager;
-import com.velocitymanager.spigot.lib.gson.Gson;
-import com.velocitymanager.spigot.lib.gson.reflect.TypeToken;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.velocitymanager.spigot.model.GameServer;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
