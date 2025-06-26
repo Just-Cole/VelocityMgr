@@ -1,0 +1,12 @@
+{
+  "id": "velocitymanagerplugin",
+  "name": "VelocityManagerPlugin",
+  "version": "${project.version}",
+  "description": "In-game GUI for Velocity Manager",
+  "url": "http://localhost:4000",
+  "authors": [
+    "VelocityManager"
+  ],
+  "dependencies": [],
+  "main": "com.velocitymanager.plugin.VelocityManagerPlugin"
+}

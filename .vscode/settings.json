@@ -1,0 +1,9 @@
+{
+    "IDX.aI.enableInlineCompletion": true,
+    "IDX.aI.enableCodebaseIndexing": true,
+    "geminicodeassist.codeGenerationPaneViewEnabled": true,
+    "workbench.editor.autoLockGroups": {
+        "imagePreview.previewEditor": true
+    },
+    "java.compile.nullAnalysis.mode": "automatic"
+}
