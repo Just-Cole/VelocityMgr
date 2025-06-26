@@ -48,8 +48,10 @@ const serverSchema = z.object({
   port: z.coerce.number().optional(),
   serverType: z.enum(["PaperMC", "Velocity"]).optional(),
   version: z.string().optional(),
+  
+  // Build numbers are no longer required from the frontend.
   paperBuild: z.string().optional(),
-  velocityVersion: z.string().optional(),
+  velocityVersion: z.string().optional(), // Velocity still uses its own version concept
   velocityBuild: z.string().optional(),
 
   serverZip: z.any().optional(),
@@ -69,10 +71,8 @@ const serverSchema = z.object({
     if (!data.serverType) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Please select a server type", path: ["serverType"] });
     if (data.serverType === "PaperMC") {
       if (!data.version) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Minecraft version is required for PaperMC", path: ["version"] });
-      if (!data.paperBuild) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Paper build is required for PaperMC", path: ["paperBuild"] });
     } else if (data.serverType === "Velocity") {
       if (!data.velocityVersion) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Velocity version is required", path: ["velocityVersion"] });
-      if (!data.velocityBuild) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Velocity build is required", path: ["velocityBuild"] });
     }
   } else if (data.networkSetupType === "upload_zip") {
     if (!data.name || data.name.length < 3) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Server name must be at least 3 characters", path: ["name"] });
@@ -100,13 +100,6 @@ interface ApiVersionResponse {
   versions: string[];
 }
 
-interface ApiBuildsResponse {
-  project_id: string;
-  project_name: string;
-  version: string;
-  builds: { build: number }[];
-}
-
 export default function CreateServerPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -115,18 +108,10 @@ export default function CreateServerPage() {
   const canCreate = user?.permissions?.includes('create_servers');
 
   const [minecraftVersions, setMinecraftVersions] = React.useState<string[]>([]);
-  const [paperBuilds, setPaperBuilds] = React.useState<number[]>([]);
-  const [latestPaperBuildNumber, setLatestPaperBuildNumber] = React.useState<number | null>(null);
   const [isLoadingMinecraftVersions, setIsLoadingMinecraftVersions] = React.useState(false);
-  const [isLoadingPaperBuilds, setIsLoadingPaperBuilds] = React.useState(false);
-  const [fullPaperVersion, setFullPaperVersion] = React.useState<string | null>(null);
 
   const [velocityVersions, setVelocityVersions] = React.useState<string[]>([]);
-  const [velocityBuilds, setVelocityBuilds] = React.useState<number[]>([]);
-  const [latestVelocityBuildNumber, setLatestVelocityBuildNumber] = React.useState<number | null>(null);
   const [isLoadingVelocityVersions, setIsLoadingVelocityVersions] = React.useState(false);
-  const [isLoadingVelocityBuilds, setIsLoadingVelocityBuilds] = React.useState(false);
-  const [fullVelocityVersion, setFullVelocityVersion] = React.useState<string | null>(null);
   
   // Modpack state
   const [modpackSearchQuery, setModpackSearchQuery] = React.useState("");
@@ -154,9 +139,7 @@ export default function CreateServerPage() {
       port: 25565,
       serverType: "PaperMC",
       version: "",
-      paperBuild: "",
       velocityVersion: "",
-      velocityBuild: "",
       jarFileName: "server.jar",
       minRam: "1024M",
       maxRam: "2048M",
@@ -165,8 +148,6 @@ export default function CreateServerPage() {
 
   const selectedNetworkSetupType = watch("networkSetupType");
   const selectedServerType = watch("serverType");
-  const selectedMinecraftVersion = watch("version");
-  const selectedVelocityVersion = watch("velocityVersion");
 
   // Fetch PaperMC versions
   React.useEffect(() => {
@@ -189,42 +170,6 @@ export default function CreateServerPage() {
     fetchMcVersions();
   }, [selectedNetworkSetupType, selectedServerType, minecraftVersions.length, toast]);
 
-  // Fetch PaperMC builds when a version is selected
-  React.useEffect(() => {
-    if (selectedNetworkSetupType !== "single_server" || selectedServerType !== "PaperMC" || !selectedMinecraftVersion) {
-        setPaperBuilds([]);
-        setFullPaperVersion(null);
-        return;
-    };
-
-    const fetchPaperBuilds = async () => {
-      setIsLoadingPaperBuilds(true);
-      resetField("paperBuild");
-      setPaperBuilds([]);
-      setFullPaperVersion(null);
-      try {
-        const response = await fetch(`/api/papermc/builds/paper/${selectedMinecraftVersion}`);
-        if (!response.ok) throw new Error(`Failed to fetch builds for version ${selectedMinecraftVersion}`);
-        const data: ApiBuildsResponse = await response.json();
-        const builds = (data.builds || []).map(b => b.build).reverse();
-        setPaperBuilds(builds);
-        setFullPaperVersion(data.version);
-        if (builds.length > 0) {
-            const latestBuild = builds[0];
-            setLatestPaperBuildNumber(latestBuild);
-            setValue("paperBuild", String(latestBuild));
-        }
-      } catch (err) {
-        toast({ title: "Error", description: "Could not load Paper builds for the selected version.", variant: "destructive" });
-        setPaperBuilds([]);
-      } finally {
-        setIsLoadingPaperBuilds(false);
-      }
-    };
-    fetchPaperBuilds();
-  }, [selectedNetworkSetupType, selectedServerType, selectedMinecraftVersion, resetField, setValue, toast]);
-
-
   // Fetch Velocity versions
   React.useEffect(() => {
     if (selectedNetworkSetupType !== "single_server" || selectedServerType !== "Velocity" || velocityVersions.length > 0) return;
@@ -245,41 +190,6 @@ export default function CreateServerPage() {
     };
     fetchVeloVersions();
   }, [selectedNetworkSetupType, selectedServerType, velocityVersions.length, toast]);
-
-
-  // Fetch Velocity builds when a version is selected
-  React.useEffect(() => {
-    if (selectedNetworkSetupType !== "single_server" || selectedServerType !== "Velocity" || !selectedVelocityVersion) {
-        setVelocityBuilds([]);
-        return;
-    };
-
-    const fetchVelocityBuilds = async () => {
-      setIsLoadingVelocityBuilds(true);
-      resetField("velocityBuild");
-      setVelocityBuilds([]);
-      setFullVelocityVersion(null);
-      try {
-        const response = await fetch(`/api/papermc/builds/velocity/${selectedVelocityVersion}`);
-        if (!response.ok) throw new Error(`Failed to fetch builds for Velocity version ${selectedVelocityVersion}`);
-        const data: ApiBuildsResponse = await response.json();
-        const builds = (data.builds || []).map(b => b.build).reverse();
-        setVelocityBuilds(builds);
-        setFullVelocityVersion(data.version);
-        if (builds.length > 0) {
-            const latestBuild = builds[0];
-            setLatestVelocityBuildNumber(latestBuild);
-            setValue("velocityBuild", String(latestBuild));
-        }
-      } catch (err) {
-        toast({ title: "Error", description: "Could not load Velocity builds for the selected version.", variant: "destructive" });
-        setVelocityBuilds([]);
-      } finally {
-        setIsLoadingVelocityBuilds(false);
-      }
-    };
-    fetchVelocityBuilds();
-  }, [selectedNetworkSetupType, selectedServerType, selectedVelocityVersion, resetField, setValue, toast]);
   
   const handleSetupTypeChange = (value: string) => {
     const currentValues = watch();
@@ -439,24 +349,12 @@ export default function CreateServerPage() {
         modpackVersionId: data.modpackVersionId,
       };
     } else { // single_server
-      if (data.serverType === 'PaperMC' && !fullPaperVersion) {
-          toast({ title: "Incomplete Selection", description: "Please wait for build information to load before creating the server.", variant: "destructive" });
-          setIsLoading(false);
-          return;
-      }
-      if (data.serverType === 'Velocity' && !fullVelocityVersion) {
-          toast({ title: "Incomplete Selection", description: "Please wait for build information to load before creating the server.", variant: "destructive" });
-          setIsLoading(false);
-          return;
-      }
-
       payload = {
         serverName: data.name,
         port: data.port,
         serverType: data.serverType,
-        serverVersion: data.serverType === 'PaperMC' ? fullPaperVersion : fullVelocityVersion,
-        paperBuild: data.serverType === 'PaperMC' ? data.paperBuild : undefined,
-        velocityBuild: data.serverType === 'Velocity' ? data.velocityBuild : undefined,
+        serverVersion: data.serverType === 'PaperMC' ? data.version : data.velocityVersion,
+        // No build number is sent. The backend will fetch the latest.
       };
     }
     
@@ -697,7 +595,7 @@ export default function CreateServerPage() {
                 <div>
                   <Label htmlFor="serverType">Server Type</Label>
                   <Controller name="serverType" control={control} render={({ field }) => (
-                      <Select onValueChange={(value) => { field.onChange(value); setValue("version", ""); setValue("paperBuild", ""); setValue("velocityVersion", ""); setValue("velocityBuild", ""); setLatestPaperBuildNumber(null); setLatestVelocityBuildNumber(null); }} value={field.value}>
+                      <Select onValueChange={(value) => { field.onChange(value); setValue("version", ""); setValue("velocityVersion", ""); }} value={field.value}>
                         <SelectTrigger id="serverType" className="mt-1"><SelectValue placeholder="Select a server type" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="PaperMC">PaperMC (Minecraft Server)</SelectItem>
@@ -712,22 +610,13 @@ export default function CreateServerPage() {
                     <div>
                       <Label htmlFor="version" className="flex items-center">Minecraft Version {isLoadingMinecraftVersions && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}</Label>
                       <Controller name="version" control={control} render={({ field }) => (
-                          <Select onValueChange={(value) => { field.onChange(value); setLatestPaperBuildNumber(null); setPaperBuilds([]); resetField("paperBuild"); }} value={field.value} disabled={isLoadingMinecraftVersions || minecraftVersions.length === 0}>
+                          <Select onValueChange={field.onChange} value={field.value} disabled={isLoadingMinecraftVersions || minecraftVersions.length === 0}>
                             <SelectTrigger id="version" className="mt-1"><SelectValue placeholder={isLoadingMinecraftVersions ? "Loading versions..." : (minecraftVersions.length === 0 ? "No versions available" : "Select a version")} /></SelectTrigger>
                             <SelectContent>{minecraftVersions.map((version) => ( <SelectItem key={version} value={version}>{version}</SelectItem> ))}</SelectContent>
                           </Select>
                         )} />
+                      <p className="text-xs text-muted-foreground mt-1">The latest build for this version will be used.</p>
                       {errors.version && <p className="text-sm text-destructive mt-1">{errors.version.message}</p>}
-                    </div>
-                    <div>
-                      <Label htmlFor="paperBuild" className="flex items-center">Paper Build {isLoadingPaperBuilds && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}</Label>
-                      <Controller name="paperBuild" control={control} render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value} disabled={!selectedMinecraftVersion || isLoadingPaperBuilds || paperBuilds.length === 0}>
-                            <SelectTrigger id="paperBuild" className="mt-1"><SelectValue placeholder={ !selectedMinecraftVersion ? "Select a version first" : isLoadingPaperBuilds ? "Loading builds..." : paperBuilds.length === 0 && selectedMinecraftVersion ? "No builds available" : "Select a build" } /></SelectTrigger>
-                            <SelectContent>{paperBuilds.map((build) => ( <SelectItem key={build} value={String(build)}>{build}{build === latestPaperBuildNumber ? ' (Latest)' : ''}</SelectItem> ))}</SelectContent>
-                          </Select>
-                        )} />
-                      {errors.paperBuild && <p className="text-sm text-destructive mt-1">{errors.paperBuild.message}</p>}
                     </div>
                   </>
                 )}
@@ -736,22 +625,13 @@ export default function CreateServerPage() {
                     <div>
                       <Label htmlFor="velocityVersion" className="flex items-center">Velocity Version {isLoadingVelocityVersions && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}</Label>
                       <Controller name="velocityVersion" control={control} render={({ field }) => (
-                          <Select onValueChange={(value) => { field.onChange(value); setLatestVelocityBuildNumber(null); setVelocityBuilds([]); resetField("velocityBuild"); }} value={field.value} disabled={isLoadingVelocityVersions || velocityVersions.length === 0}>
+                          <Select onValueChange={field.onChange} value={field.value} disabled={isLoadingVelocityVersions || velocityVersions.length === 0}>
                             <SelectTrigger id="velocityVersion" className="mt-1"><SelectValue placeholder={isLoadingVelocityVersions ? "Loading versions..." : (velocityVersions.length === 0 ? "No versions available" : "Select a Velocity version")} /></SelectTrigger>
                             <SelectContent>{velocityVersions.map((version) => ( <SelectItem key={version} value={version}>{version}</SelectItem> ))}</SelectContent>
                           </Select>
                         )} />
+                      <p className="text-xs text-muted-foreground mt-1">The latest build for this version will be used.</p>
                       {errors.velocityVersion && <p className="text-sm text-destructive mt-1">{errors.velocityVersion.message}</p>}
-                    </div>
-                    <div>
-                      <Label htmlFor="velocityBuild" className="flex items-center">Velocity Build {isLoadingVelocityBuilds && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}</Label>
-                      <Controller name="velocityBuild" control={control} render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value} disabled={!selectedVelocityVersion || isLoadingVelocityBuilds || velocityBuilds.length === 0}>
-                            <SelectTrigger id="velocityBuild" className="mt-1"><SelectValue placeholder={ !selectedVelocityVersion ? "Select a Velocity version first" : isLoadingVelocityBuilds ? "Loading builds..." : velocityBuilds.length === 0 && selectedVelocityVersion ? "No builds available" : "Select a build" } /></SelectTrigger>
-                            <SelectContent>{velocityBuilds.map((build) => ( <SelectItem key={build} value={String(build)}>{build}{build === latestVelocityBuildNumber ? ' (Latest)' : ''}</SelectItem> ))}</SelectContent>
-                          </Select>
-                        )} />
-                      {errors.velocityBuild && <p className="text-sm text-destructive mt-1">{errors.velocityBuild.message}</p>}
                     </div>
                   </>
                 )}
@@ -771,4 +651,3 @@ export default function CreateServerPage() {
     </div>
   );
 }
-

@@ -2,17 +2,11 @@
 package com.velocitymanager.plugin;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import com.google.inject.Inject;
-import com.velocitypowered.api.command.CommandManager;
-import com.velocitypowered.api.command.CommandMeta;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.connection.PluginMessageEvent;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.plugin.Plugin;
-import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.ServerConnection;
 import com.velocitypowered.api.proxy.messages.ChannelIdentifier;
@@ -23,8 +17,6 @@ import com.velocitymanager.plugin.service.ApiService;
 import org.slf4j.Logger;
 
 import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Main class for the Velocity Manager in-game plugin.
@@ -59,12 +51,7 @@ public class VelocityManagerPlugin {
         server.getChannelRegistrar().register(channelIdentifier);
 
         // Register Command
-        CommandManager commandManager = server.getCommandManager();
-        CommandMeta commandMeta = commandManager.metaBuilder("vmanage")
-            .aliases("vm")
-            .build();
-
-        commandManager.register(commandMeta, new ManageCommand(this));
+        server.getCommandManager().register("vmanage", new ManageCommand(this), "vm");
         logger.info("Registered /vmanage command.");
     }
 
@@ -97,18 +84,6 @@ public class VelocityManagerPlugin {
             case "CREATE_SERVER":
                 handleCreateServer(source, data);
                 break;
-            case "GET_PAPERTMC_VERSIONS":
-                handleGetVersions(source, "paper", "PAPERTMC_VERSIONS");
-                break;
-            case "GET_VELOCITY_VERSIONS":
-                handleGetVersions(source, "velocity", "VELOCITY_VERSIONS");
-                break;
-            case "GET_PAPERTMC_BUILDS":
-                 handleGetBuilds(source, "paper", data, "PAPERTMC_BUILDS");
-                 break;
-            case "GET_VELOCITY_BUILDS":
-                 handleGetBuilds(source, "velocity", data, "VELOCITY_BUILDS");
-                 break;
         }
     }
 
@@ -171,44 +146,6 @@ public class VelocityManagerPlugin {
                 }).schedule();
                 return null;
             });
-    }
-    
-    private void handleGetVersions(ServerConnection source, String project, String responseCommand) {
-        apiService.getPaperMCVersions(project).thenAccept(versions -> {
-            server.getScheduler().buildTask(this, () -> {
-                List<String> versionList = versions.get("versions").getAsJsonArray().asList()
-                        .stream().map(JsonElement::getAsString).collect(Collectors.toList());
-                String json = gson.toJson(versionList);
-                String responseMessage = responseCommand + ":" + json;
-                source.sendPluginMessage(channelIdentifier, responseMessage.getBytes(StandardCharsets.UTF_8));
-            }).schedule();
-        }).exceptionally(ex -> {
-             logger.error("Failed to get versions for " + project, ex);
-             server.getScheduler().buildTask(this, () -> {
-                String errorMsg = "CREATION_RESPONSE:error:Failed to fetch versions from the API. Check proxy console for details.";
-                source.sendPluginMessage(channelIdentifier, errorMsg.getBytes(StandardCharsets.UTF_8));
-            }).schedule();
-             return null;
-        });
-    }
-
-    private void handleGetBuilds(ServerConnection source, String project, String version, String responseCommand) {
-        apiService.getPaperMCBuilds(project, version).thenAccept(builds -> {
-             server.getScheduler().buildTask(this, () -> {
-                 List<Integer> buildList = builds.get("builds").getAsJsonArray().asList()
-                         .stream().map(e -> e.getAsJsonObject().get("build").getAsInt()).collect(Collectors.toList());
-                 String json = gson.toJson(buildList);
-                 String responseMessage = responseCommand + ":" + json;
-                 source.sendPluginMessage(channelIdentifier, responseMessage.getBytes(StandardCharsets.UTF_8));
-             }).schedule();
-        }).exceptionally(ex -> {
-            logger.error("Failed to get builds for " + project + " v" + version, ex);
-            server.getScheduler().buildTask(this, () -> {
-                String errorMsg = "CREATION_RESPONSE:error:Failed to fetch builds from the API. Check proxy console for details.";
-                source.sendPluginMessage(channelIdentifier, errorMsg.getBytes(StandardCharsets.UTF_8));
-            }).schedule();
-            return null;
-        });
     }
 
     public ProxyServer getProxyServer() {

@@ -40,14 +40,6 @@ public class PluginMessageListener implements org.bukkit.plugin.messaging.Plugin
             case "SERVERS":
                 handleServerList(player, data);
                 break;
-            case "PAPERTMC_VERSIONS":
-            case "VELOCITY_VERSIONS":
-            case "PAPERTMC_BUILDS":
-            case "VELOCITY_BUILDS":
-                if (creationProcess != null) {
-                    creationProcess.handleApiResponse(command, data);
-                }
-                break;
             case "ACTION_RESPONSE":
             case "CREATION_RESPONSE":
                 handleResponse(player, data);

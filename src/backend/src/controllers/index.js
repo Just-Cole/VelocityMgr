@@ -740,10 +740,8 @@ class IndexController {
             serverName,
             port,
             serverType,
-            serverVersion,
-            paperBuild,
-            velocityBuild
         } = req.body;
+        let { serverVersion, paperBuild, velocityBuild } = req.body;
 
         if (!serverName || !port || !serverType || !serverVersion) {
             return res.status(400).json({
@@ -764,6 +762,23 @@ class IndexController {
                 });
             }
 
+            const isPaper = serverType === 'PaperMC';
+            const apiProjectName = isPaper ? 'paper' : 'velocity';
+            let buildNumber = isPaper ? paperBuild : velocityBuild;
+
+            if (!buildNumber) {
+                console.log(`[Create Server] Build not specified for ${serverType} ${serverVersion}. Fetching latest build...`);
+                const buildsResponse = await httpsGetJson(`https://api.papermc.io/v2/projects/${apiProjectName}/versions/${serverVersion}/builds`);
+                const latestBuildDetails = buildsResponse.builds.pop(); // Last in array is latest
+                if (!latestBuildDetails) {
+                    return res.status(404).json({ message: `Could not find any builds for ${serverType} version ${serverVersion}. Please check the version number.` });
+                }
+                buildNumber = latestBuildDetails.build;
+                // Use the full version string from the API response for accuracy
+                serverVersion = buildsResponse.version; 
+                console.log(`[Create Server] Found latest build for ${serverVersion}: ${buildNumber}`);
+            }
+
             const newServerId = uuidv4();
             const newServer = {
                 id: newServerId,
@@ -772,8 +787,8 @@ class IndexController {
                 ip: '127.0.0.1',
                 softwareType: serverType,
                 serverVersion: serverVersion,
-                paperBuild: paperBuild,
-                velocityBuild: velocityBuild,
+                paperBuild: isPaper ? buildNumber : undefined,
+                velocityBuild: !isPaper ? buildNumber : undefined,
                 status: 'Offline',
                 connectedPlayers: [],
                 maxPlayers: 20,
@@ -787,9 +802,6 @@ class IndexController {
                 recursive: true
             });
 
-            const isPaper = serverType === 'PaperMC';
-            const apiProjectName = isPaper ? 'paper' : 'velocity';
-            const buildNumber = isPaper ? paperBuild : velocityBuild;
             const downloadFileName = `${apiProjectName}-${serverVersion}-${buildNumber}.jar`;
             const serverJarPath = path.join(serverFolderPath, downloadFileName);
 
@@ -881,7 +893,10 @@ class IndexController {
             });
 
         } catch (error) {
-            next(error);
+             if (error.statusCode === 404) {
+                return res.status(404).json({ message: `Version '${serverVersion}' not found on PaperMC API. Please check the version number.` });
+             }
+             next(error);
         }
     }
 

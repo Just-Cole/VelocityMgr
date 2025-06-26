@@ -2,7 +2,6 @@
 package com.velocitymanager.plugin.service;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import com.velocitymanager.plugin.model.GameServer;
 import okhttp3.*;
@@ -20,20 +19,6 @@ public class ApiService {
 
     public ApiService(String baseUrl) {
         this.baseUrl = baseUrl;
-    }
-    
-    public CompletableFuture<JsonObject> getPaperMCVersions(String project) {
-        CompletableFuture<JsonObject> future = new CompletableFuture<>();
-        Request request = new Request.Builder().url(baseUrl + "/papermc/versions/" + project).build();
-        client.newCall(request).enqueue(new ApiCallback<>(future, JsonObject.class, gson));
-        return future;
-    }
-
-    public CompletableFuture<JsonObject> getPaperMCBuilds(String project, String version) {
-        CompletableFuture<JsonObject> future = new CompletableFuture<>();
-        Request request = new Request.Builder().url(baseUrl + "/papermc/builds/" + project + "/" + version).build();
-        client.newCall(request).enqueue(new ApiCallback<>(future, JsonObject.class, gson));
-        return future;
     }
 
     public CompletableFuture<List<GameServer>> fetchServers() {
