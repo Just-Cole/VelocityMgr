@@ -87,8 +87,12 @@ public class ApiService {
                              future.completeExceptionally(new IOException("Request failed with status " + response.code() + ": " + responseString));
                         }
                     } else {
-                        ActionResponse actionResponse = gson.fromJson(responseString, ActionResponse.class);
-                        future.complete(actionResponse.message());
+                        try {
+                            ActionResponse actionResponse = gson.fromJson(responseString, ActionResponse.class);
+                            future.complete(actionResponse.message());
+                        } catch(Exception e) {
+                            future.completeExceptionally(new IOException("Failed to parse successful response: " + responseString));
+                        }
                     }
                 }
             }
