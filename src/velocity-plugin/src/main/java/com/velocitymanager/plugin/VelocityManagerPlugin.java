@@ -49,7 +49,7 @@ public class VelocityManagerPlugin {
     public VelocityManagerPlugin(ProxyServer server, Logger logger) {
         this.server = server;
         this.logger = logger;
-        this.apiService = new ApiService("http://localhost:3005/api");
+        this.apiService = new ApiService("http://127.0.0.1:3005/api");
         logger.info("VelocityManagerPlugin has been loaded!");
     }
 
@@ -142,7 +142,7 @@ public class VelocityManagerPlugin {
                     })
                     .exceptionally(ex -> {
                         server.getScheduler().buildTask(this, () -> {
-                            String errorMsg = "ACTION_RESPONSE:error:Failed to " + action + " server: " + ex.getCause().getMessage();
+                            String errorMsg = "ACTION_RESPONSE:error:Failed to " + action + " server: " + ex.getMessage();
                             source.sendPluginMessage(channelIdentifier, errorMsg.getBytes(StandardCharsets.UTF_8));
                         }).schedule();
                         return null;
@@ -166,7 +166,7 @@ public class VelocityManagerPlugin {
             })
             .exceptionally(ex -> {
                 server.getScheduler().buildTask(this, () -> {
-                    String errorMsg = "CREATION_RESPONSE:error:Failed to create server: " + ex.getCause().getMessage();
+                    String errorMsg = "CREATION_RESPONSE:error:Failed to create server: " + ex.getMessage();
                     source.sendPluginMessage(channelIdentifier, errorMsg.getBytes(StandardCharsets.UTF_8));
                 }).schedule();
                 return null;
@@ -184,6 +184,10 @@ public class VelocityManagerPlugin {
             }).schedule();
         }).exceptionally(ex -> {
              logger.error("Failed to get versions for " + project, ex);
+             server.getScheduler().buildTask(this, () -> {
+                String errorMsg = "CREATION_RESPONSE:error:Failed to fetch versions from the API. Check proxy console for details.";
+                source.sendPluginMessage(channelIdentifier, errorMsg.getBytes(StandardCharsets.UTF_8));
+            }).schedule();
              return null;
         });
     }
@@ -199,6 +203,10 @@ public class VelocityManagerPlugin {
              }).schedule();
         }).exceptionally(ex -> {
             logger.error("Failed to get builds for " + project + " v" + version, ex);
+            server.getScheduler().buildTask(this, () -> {
+                String errorMsg = "CREATION_RESPONSE:error:Failed to fetch builds from the API. Check proxy console for details.";
+                source.sendPluginMessage(channelIdentifier, errorMsg.getBytes(StandardCharsets.UTF_8));
+            }).schedule();
             return null;
         });
     }
