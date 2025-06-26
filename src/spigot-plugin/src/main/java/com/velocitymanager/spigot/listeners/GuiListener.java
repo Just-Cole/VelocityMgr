@@ -5,6 +5,8 @@ import com.velocitymanager.spigot.SpigotVManager;
 import com.velocitymanager.spigot.model.GameServer;
 import com.velocitymanager.spigot.ui.ServerActionUI;
 import com.velocitymanager.spigot.ui.ServerListUI;
+import net.kyori.adventure.text.TextComponent;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -26,34 +28,42 @@ public class GuiListener implements Listener {
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
-        String mainTitle = plugin.getServerListUI().getInventoryTitle();
-        String actionTitlePrefix = ServerActionUI.getInventoryTitlePrefix();
-        String viewTitle = event.getView().title().examinableName();
-        
-        boolean isVManagerGui = viewTitle.equals(mainTitle) || viewTitle.startsWith(actionTitlePrefix);
-
-        if (!isVManagerGui || !(event.getWhoClicked() instanceof Player)) {
+        String mainGuiTitle = plugin.getServerListUI().getInventoryTitle();
+        String actionGuiPrefix = ServerActionUI.getInventoryTitlePrefix();
+        String clickedGuiTitle;
+        try {
+            // This is a more robust way to get the plain text from an Adventure Component title
+            clickedGuiTitle = ((TextComponent) event.getView().title()).content();
+        } catch (ClassCastException e) {
+            // The title is not a simple TextComponent, so it's not our GUI.
             return;
         }
 
+        // If the title doesn't match one of our GUIs, do nothing.
+        if (!clickedGuiTitle.equals(mainGuiTitle) && !clickedGuiTitle.startsWith(actionGuiPrefix)) {
+            return;
+        }
+
+        // It is one of our GUIs, so we MUST cancel the event to prevent item movement.
         event.setCancelled(true);
+
+        if (!(event.getWhoClicked() instanceof Player)) {
+            return;
+        }
+
         Player player = (Player) event.getWhoClicked();
         ItemStack clickedItem = event.getCurrentItem();
 
-        if (clickedItem == null || clickedItem.getItemMeta() == null) {
+        // Ignore clicks on empty slots or items without metadata
+        if (clickedItem == null || clickedItem.getType() == Material.AIR || clickedItem.getItemMeta() == null) {
             return;
         }
 
         PersistentDataContainer data = clickedItem.getItemMeta().getPersistentDataContainer();
-        
-        // Handle clicks in the main server list GUI
-        if (viewTitle.equals(mainTitle)) {
-            handleServerListClick(player, data);
-            return;
-        }
 
-        // Handle clicks in the action GUI
-        if (viewTitle.startsWith(actionTitlePrefix)) {
+        if (clickedGuiTitle.equals(mainGuiTitle)) {
+            handleServerListClick(player, data);
+        } else if (clickedGuiTitle.startsWith(actionGuiPrefix)) {
             handleActionGuiClick(player, data);
         }
     }
