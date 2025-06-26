@@ -11,6 +11,7 @@ import com.velocitypowered.api.command.CommandMeta;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.connection.PluginMessageEvent;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
+import com.velocitypowered.api.plugin.Plugin;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.ServerConnection;
@@ -190,7 +191,7 @@ public class VelocityManagerPlugin {
     private void handleGetBuilds(ServerConnection source, String project, String version, String responseCommand) {
         apiService.getPaperMCBuilds(project, version).thenAccept(builds -> {
              server.getScheduler().buildTask(this, () -> {
-                 List<Integer> buildList = builds.getAsJsonObject("builds").getAsJsonArray().asList()
+                 List<Integer> buildList = builds.get("builds").getAsJsonArray().asList()
                          .stream().map(e -> e.getAsJsonObject().get("build").getAsInt()).collect(Collectors.toList());
                  String json = gson.toJson(buildList);
                  String responseMessage = responseCommand + ":" + json;

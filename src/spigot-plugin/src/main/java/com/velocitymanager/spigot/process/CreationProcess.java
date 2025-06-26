@@ -6,6 +6,7 @@ import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
 import com.velocitymanager.spigot.SpigotVManager;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -167,14 +168,15 @@ public class CreationProcess {
                     this.availableVersions = gson.fromJson(data, listType);
                     Collections.reverse(this.availableVersions); // Show newest first
                     sendPrompt(Component.text("Please choose a version from the list:", NamedTextColor.GOLD));
-                    Component versionsComponent = Component.text();
+                    
+                    TextComponent.Builder versionsBuilder = Component.text();
                     for(String v : this.availableVersions) {
-                        versionsComponent = versionsComponent.append(
+                        versionsBuilder.append(
                                 Component.text(" [" + v + "] ", NamedTextColor.AQUA)
                                         .clickEvent(ClickEvent.suggestCommand(v))
                         );
                     }
-                    player.sendMessage(versionsComponent);
+                    player.sendMessage(versionsBuilder.build());
                     break;
                 }
                  case "PAPERTMC_BUILDS":
