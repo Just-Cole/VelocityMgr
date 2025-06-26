@@ -8,8 +8,8 @@ import com.velocitymanager.spigot.model.GameServer;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.messaging.PluginMessageListener;
 import org.jetbrains.annotations.NotNull;
+
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.util.List;

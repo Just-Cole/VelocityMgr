@@ -15,6 +15,7 @@ import org.bukkit.persistence.PersistentDataType;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Optional;
 
 public class GuiListener implements Listener {
     private final SpigotVManager plugin;
@@ -83,11 +84,10 @@ public class GuiListener implements Listener {
         
         // If it's a server item, open the action UI for it
         if (serverName != null) {
-            plugin.getServerListUI().getServerByName(serverName).thenAccept(serverOpt -> {
-                serverOpt.ifPresent(server -> {
-                    // Run on main thread to open GUI
-                    plugin.getServer().getScheduler().runTask(plugin, () -> ServerActionUI.open(player, server));
-                });
+            Optional<GameServer> serverOpt = plugin.getServerListUI().getServerByName(serverName);
+            serverOpt.ifPresent(server -> {
+                // Run on main thread to open GUI
+                plugin.getServer().getScheduler().runTask(plugin, () -> ServerActionUI.open(player, server));
             });
         }
     }
