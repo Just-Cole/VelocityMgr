@@ -1,3 +1,4 @@
+
 package com.velocitymanager.plugin.command;
 
 import com.velocitypowered.api.command.SimpleCommand;
@@ -38,13 +39,26 @@ public class ManageCommand implements SimpleCommand {
         }
 
         String action = args[0].toLowerCase();
-        if (args.length < 2 || !(action.equals("start") || action.equals("stop") || action.equals("restart"))) {
-            player.sendMessage(Component.text("Usage: /vmanage <start|stop|restart> <server_name>", NamedTextColor.RED));
+        if (!(action.equals("start") || action.equals("stop") || action.equals("restart"))) {
+            player.sendMessage(Component.text("Invalid action. Usage: /vmanage <start|stop|restart> <server_name>", NamedTextColor.RED));
             return;
         }
 
-        String serverName = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
-        handleServerAction(player, serverName, action);
+        if (args.length < 2) {
+            player.sendMessage(Component.text("Please specify a server name.", NamedTextColor.RED));
+            return;
+        }
+
+        boolean isConfirmed = args[args.length - 1].equalsIgnoreCase("--confirm");
+        int serverNameEndIndex = isConfirmed ? args.length - 1 : args.length;
+        String serverName = String.join(" ", Arrays.copyOfRange(args, 1, serverNameEndIndex));
+
+        if (serverName.trim().isEmpty()) {
+            player.sendMessage(Component.text("Please specify a server name.", NamedTextColor.RED));
+            return;
+        }
+
+        handleServerAction(player, serverName, action, isConfirmed);
     }
 
     private void listServers(Player player) {
@@ -80,7 +94,7 @@ public class ManageCommand implements SimpleCommand {
         });
     }
 
-    private void handleServerAction(Player player, String serverName, String action) {
+    private void handleServerAction(Player player, String serverName, String action, boolean isConfirmed) {
         player.sendMessage(Component.text("Requesting to " + action + " server '" + serverName + "'...", NamedTextColor.GRAY));
         plugin.getApiService().fetchServers().thenAcceptAsync(servers -> {
             GameServer targetServer = servers.stream()
@@ -92,6 +106,19 @@ public class ManageCommand implements SimpleCommand {
                 player.sendMessage(Component.text("Server '" + serverName + "' not found.", NamedTextColor.RED));
                 return;
             }
+            
+            // Safety check for stopping/restarting the current proxy
+            int currentProxyPort = plugin.getProxyServer().getBoundAddress().getPort();
+            if (targetServer.port() == currentProxyPort && (action.equals("stop") || action.equals("restart")) && !isConfirmed) {
+                player.sendMessage(Component.text("Warning: You are trying to " + action + " the proxy you are connected to.", NamedTextColor.YELLOW));
+                player.sendMessage(Component.text("This will disconnect all players. To proceed, run this command again with --confirm at the end, or click here: ", NamedTextColor.YELLOW)
+                        .append(Component.text("/vmanage " + action + " " + serverName + " --confirm", NamedTextColor.RED)
+                                .clickEvent(ClickEvent.suggestCommand("/vmanage " + action + " " + serverName + " --confirm"))
+                        )
+                );
+                return;
+            }
+
 
             plugin.getApiService().performServerAction(targetServer, action).thenAccept(responseMessage -> {
                 player.sendMessage(Component.text(responseMessage, NamedTextColor.GREEN));
@@ -113,6 +140,11 @@ public class ManageCommand implements SimpleCommand {
     @Override
     public CompletableFuture<List<String>> suggestAsync(final Invocation invocation) {
         String[] args = invocation.arguments();
+        
+        // If --confirm is the last argument, don't suggest anything further.
+        if (args.length > 1 && args[args.length - 1].equalsIgnoreCase("--confirm")) {
+            return CompletableFuture.completedFuture(java.util.Collections.emptyList());
+        }
         
         // Suggest actions: start, stop, restart
         if (args.length <= 1) {
