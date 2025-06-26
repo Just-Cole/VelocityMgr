@@ -818,15 +818,37 @@ class IndexController {
                 await fsPromises.writeFile(eulaPath, 'eula=true', 'utf-8');
             }
 
-            // Explicitly set the port in server.properties
             if (newServer.softwareType === 'PaperMC') {
                 await this._updateServerPropertiesPort(newServer, newServer.port);
             }
+            
+            // --- Copy companion plugin ---
+            let pluginJarName, pluginSrcPath;
+            if (newServer.softwareType === 'PaperMC') {
+                pluginJarName = 'spigot-vmanager-plugin-1.0.0.jar';
+                pluginSrcPath = path.join(__dirname, '..', '..', '..', 'spigot-plugin', 'target', pluginJarName);
+            } else if (newServer.softwareType === 'Velocity') {
+                pluginJarName = 'velocity-manager-plugin-1.0.0.jar';
+                pluginSrcPath = path.join(__dirname, '..', '..', '..', 'velocity-plugin', 'target', pluginJarName);
+            }
+
+            if (pluginJarName && pluginSrcPath) {
+                if (fs.existsSync(pluginSrcPath)) {
+                    const pluginsDestDir = path.join(serverFolderPath, 'plugins');
+                    await fsPromises.mkdir(pluginsDestDir, { recursive: true });
+                    const pluginDestPath = path.join(pluginsDestDir, pluginJarName);
+                    await fsPromises.copyFile(pluginSrcPath, pluginDestPath);
+                    console.log(`[Create Server] Copied ${pluginJarName} to new server's plugins folder.`);
+                } else {
+                    console.warn(`[Create Server] Companion plugin JAR not found at ${pluginSrcPath}. It was not copied. Please build the plugins first.`);
+                }
+            }
+            // --- End plugin copy ---
+
 
             servers.push(newServer);
             this._writeServers(servers);
 
-            // --- NEW LOGIC TO UPDATE PROXY CONFIG ---
             if (newServer.softwareType === 'PaperMC') {
                 const allServers = this._readServers();
                 const proxyServer = allServers.find(s => s.softwareType === 'Velocity');
@@ -841,7 +863,6 @@ class IndexController {
                             const tomlContent = await fsPromises.readFile(tomlPath, 'utf8');
                             tomlConfig = TOML.parse(tomlContent);
                         } else {
-                            // Create a default velocity.toml if it doesn't exist
                             tomlConfig = {
                                 servers: {},
                                 'online-mode': true,
@@ -852,11 +873,9 @@ class IndexController {
                             tomlConfig.servers = {};
                         }
 
-                        // Sanitize the server name for use as a key in TOML
                         const serverEntryName = newServer.name.toLowerCase().replace(/[^a-z0-9]/g, '');
                         tomlConfig.servers[serverEntryName] = `${newServer.ip}:${newServer.port}`;
 
-                        // Set the try order, adding the new server if a hub doesn't exist
                         if (!tomlConfig.try) {
                             tomlConfig.try = [];
                         }
@@ -870,7 +889,6 @@ class IndexController {
                         await fsPromises.writeFile(tomlPath, TOML.stringify(tomlConfig), 'utf8');
                         console.log(`[Create Server] Successfully added new server '${newServer.name}' to proxy '${proxyServer.name}' config.`);
                         
-                        // Sync the forwarding secret
                         await this._syncVelocitySecret(newServer, proxyServer);
 
                         return res.status(201).json({
@@ -886,11 +904,9 @@ class IndexController {
                         });
                     }
                 } else {
-                    // No proxy found, just send the standard success message
                     console.log(`[Create Server] New PaperMC server created, but no Velocity proxy was found to link it to.`);
                 }
             }
-            // --- END OF NEW LOGIC ---
 
             res.status(201).json({
                 message: `Server "${newServer.name}" created successfully. You can now manage it from the dashboard.`,
