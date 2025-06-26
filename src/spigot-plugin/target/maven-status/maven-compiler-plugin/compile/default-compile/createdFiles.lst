@@ -1,5 +1,6 @@
 com/velocitymanager/spigot/SpigotVManager.class
 com/velocitymanager/spigot/ui/ServerListUI.class
+com/velocitymanager/spigot/ui/ServerActionUI.class
 com/velocitymanager/spigot/listeners/GuiListener.class
 com/velocitymanager/spigot/model/GameServer.class
 com/velocitymanager/spigot/commands/ManageGuiCommand.class
