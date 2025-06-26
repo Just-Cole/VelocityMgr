@@ -361,7 +361,7 @@ class IndexController {
         let changesMade = false;
         for (let i = 0; i < servers.length; i++) {
             const server = servers[i];
-            if (server.pid && (server.status === 'Online' || server.status === 'Starting' || server.status === 'Restarting')) {
+            if (server.pid && (server.status === 'Online' || server.status === 'Starting' || server.status === 'restarting')) {
                 try {
                     process.kill(server.pid, 0);
                     this.activeServerProcesses[server.id] = {
@@ -516,17 +516,6 @@ class IndexController {
         if (serverProcess) {
             if (serverProcess.stdin && !serverProcess.stdin.destroyed) serverProcess.stdin.end();
             delete this.activeServerProcesses[serverId];
-        }
-        const srvs = this._readServers();
-        const sIdx = srvs.findIndex(s => s.id === serverId);
-        if (sIdx !== -1) {
-            if (srvs[sIdx].status !== 'Offline') srvs[sIdx].status = 'Offline';
-            srvs[sIdx].pid = undefined;
-            srvs[sIdx].connectedPlayers = [];
-            srvs[sIdx].cpuUsage = 0;
-            srvs[sIdx].ramUsage = 0;
-            srvs[sIdx].currentRam = 0;
-            this._writeServers(srvs);
         }
     }
 
@@ -1168,8 +1157,9 @@ class IndexController {
                 let srvs = this._readServers();
                 let srvIdx = srvs.findIndex(s => s.id === server.id);
                 if (srvIdx !== -1) {
+                    const currentServerStateInSpawn = srvs[srvIdx];
                     // Set status to Starting or restarting, not Online immediately
-                    srvs[srvIdx].status = server.status === 'restarting' ? 'restarting' : 'Starting';
+                    srvs[srvIdx].status = currentServerStateInSpawn.status === 'restarting' ? 'restarting' : 'Starting';
                     srvs[srvIdx].pid = serverProcess.pid;
                     srvs[srvIdx].consoleLogFile = consoleLogFilePath;
                     this._writeServers(srvs);
@@ -1182,13 +1172,47 @@ class IndexController {
 
             serverProcess.on('exit', (code) => {
                 console.log(`Server ${server.name} (PID: ${serverProcess.pid}) exited with code ${code}.`);
-                logStream.end();
+                const logStream = this.activeLogFileStreams[server.id];
+                if (logStream) {
+                    logStream.end();
+                }
+
+                const servers = this._readServers();
+                const serverIndex = servers.findIndex(s => s.id === server.id);
+                if (serverIndex === -1) {
+                    this._cleanupServerProcess(server.id);
+                    return;
+                }
+
+                const currentServer = servers[serverIndex];
+
+                if (currentServer.status === 'restarting') {
+                    console.log(`Exit detected for restarting server ${server.name}. Restart logic will take over.`);
+                } else if (currentServer.status === 'stopping') {
+                    console.log(`Exit detected for stopping server ${server.name}. Setting status to Offline.`);
+                    servers[serverIndex].status = 'Offline';
+                    this._writeServers(servers);
+                } else {
+                    console.log(`Unexpected exit for server ${server.name}. Marking as Error.`);
+                    servers[serverIndex].status = 'Error';
+                    this._writeServers(servers);
+                }
+                // General cleanup of process and streams
                 this._cleanupServerProcess(server.id);
             });
 
             serverProcess.on('error', (err) => {
                 console.error(`Failed to start server ${server.name}:`, err);
-                logStream.end();
+                const logStream = this.activeLogFileStreams[server.id];
+                if (logStream) {
+                    logStream.end();
+                }
+                const servers = this._readServers();
+                const serverIndex = servers.findIndex(s => s.id === server.id);
+                 if (serverIndex !== -1) {
+                    servers[serverIndex].status = 'Error';
+                    this._writeServers(servers);
+                 }
                 this._cleanupServerProcess(server.id);
             });
 
@@ -1213,18 +1237,18 @@ class IndexController {
             const serverProcess = this.activeServerProcesses[server.id];
     
             if (!serverProcess || server.status === 'Offline') {
+                // If it's already offline, just ensure the state is consistent.
                 if (server.status !== 'Offline') {
-                    server.status = 'Offline';
-                    server.pid = undefined;
+                    servers[serverIndex].status = 'Offline';
+                    servers[serverIndex].pid = undefined;
                     this._writeServers(servers);
                 }
                 return res.status(200).json({ message: `Server "${server.name}" is already offline.` });
             }
     
-            server.status = 'stopping';
-            servers[serverIndex] = server;
+            servers[serverIndex].status = 'stopping';
             this._writeServers(servers);
-            res.status(200).json({ message: `Stopping server "${server.name}"...`, server });
+            res.status(200).json({ message: `Stopping server "${server.name}"...`, server: servers[serverIndex] });
     
             if (serverProcess.stdin && !serverProcess.stdin.destroyed) {
                 serverProcess.stdin.write('stop\n');
@@ -1268,10 +1292,9 @@ class IndexController {
                 return this.startMinecraft(req, res, next);
             }
     
-            server.status = 'restarting';
-            servers[serverIndex] = server;
+            servers[serverIndex].status = 'restarting';
             this._writeServers(servers);
-            res.status(200).json({ message: `Restarting server "${server.name}"...`, server });
+            res.status(200).json({ message: `Restarting server "${serverName}"...`, server: servers[serverIndex] });
     
             const startServerLogic = async () => {
                 const fakeReq = { body: { serverName } };
@@ -2028,3 +2051,4 @@ try {
 module.exports = IndexController;
 
     
+
