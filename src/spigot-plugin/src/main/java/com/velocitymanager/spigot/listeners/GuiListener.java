@@ -7,7 +7,6 @@ import com.velocitymanager.spigot.ui.ServerActionUI;
 import com.velocitymanager.spigot.ui.ServerListUI;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
-import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -52,7 +51,11 @@ public class GuiListener implements Listener {
         Player player = (Player) event.getWhoClicked();
         ItemStack clickedItem = event.getCurrentItem();
 
-        if (clickedItem == null || clickedItem.getType() == Material.AIR || clickedItem.getItemMeta() == null) {
+        if (clickedItem == null || clickedItem.getType() == Material.AIR) {
+            return;
+        }
+        
+        if (clickedItem.getItemMeta() == null) {
             return;
         }
 
@@ -76,7 +79,7 @@ public class GuiListener implements Listener {
             }
             if ("create_server".equals(navAction)) {
                 player.closeInventory();
-                player.sendMessage(Component.text("Please use the web dashboard to create a new server.", NamedTextColor.GREEN));
+                plugin.startCreationProcess(player);
                 return;
             }
             if ("next_page".equals(navAction) || "prev_page".equals(navAction)) {

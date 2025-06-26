@@ -1,12 +1,16 @@
+
 package com.velocitymanager.plugin;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.google.inject.Inject;
 import com.velocitypowered.api.command.CommandManager;
 import com.velocitypowered.api.command.CommandMeta;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.connection.PluginMessageEvent;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
-import com.velocitypowered.api.plugin.Plugin;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.ServerConnection;
@@ -15,18 +19,14 @@ import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
 import com.velocitymanager.plugin.command.ManageCommand;
 import com.velocitymanager.plugin.model.GameServer;
 import com.velocitymanager.plugin.service.ApiService;
-import com.google.gson.Gson;
 import org.slf4j.Logger;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Main class for the Velocity Manager in-game plugin.
- *
- * To build this plugin, navigate to the `src/velocity-plugin` directory
- * in your terminal and run the command: `mvn clean package`.
- * This will create the plugin .jar file in the `target` directory.
  */
 @Plugin(
     id = "velocitymanagerplugin",
@@ -48,7 +48,6 @@ public class VelocityManagerPlugin {
     public VelocityManagerPlugin(ProxyServer server, Logger logger) {
         this.server = server;
         this.logger = logger;
-        // The API URL should be configurable in a real plugin.
         this.apiService = new ApiService("http://localhost:3005/api");
         logger.info("VelocityManagerPlugin has been loaded!");
     }
@@ -80,17 +79,35 @@ public class VelocityManagerPlugin {
 
         ServerConnection source = (ServerConnection) event.getSource();
         String message = new String(event.getData(), StandardCharsets.UTF_8);
-        String[] parts = message.split(":", 3);
+        String[] parts = message.split(":", 2);
+        String command = parts[0];
+        String data = parts.length > 1 ? parts[1] : "";
 
-        if (parts.length > 0) {
-            String command = parts[0];
-            if ("GET_SERVERS".equals(command)) {
+        switch(command) {
+            case "GET_SERVERS":
                 handleGetServers(source);
-            } else if ("ACTION".equals(command) && parts.length == 3) {
-                String action = parts[1];
-                String serverName = parts[2];
-                handleServerAction(source, action, serverName);
-            }
+                break;
+            case "ACTION":
+                String[] actionParts = data.split(":", 2);
+                if (actionParts.length == 2) {
+                    handleServerAction(source, actionParts[0], actionParts[1]);
+                }
+                break;
+            case "CREATE_SERVER":
+                handleCreateServer(source, data);
+                break;
+            case "GET_PAPERTMC_VERSIONS":
+                handleGetVersions(source, "paper", "PAPERTMC_VERSIONS");
+                break;
+            case "GET_VELOCITY_VERSIONS":
+                handleGetVersions(source, "velocity", "VELOCITY_VERSIONS");
+                break;
+            case "GET_PAPERTMC_BUILDS":
+                 handleGetBuilds(source, "paper", data, "PAPERTMC_BUILDS");
+                 break;
+            case "GET_VELOCITY_BUILDS":
+                 handleGetBuilds(source, "velocity", data, "VELOCITY_BUILDS");
+                 break;
         }
     }
 
@@ -135,6 +152,53 @@ public class VelocityManagerPlugin {
                     source.sendPluginMessage(channelIdentifier, errorMsg.getBytes(StandardCharsets.UTF_8));
                  }).schedule();
             }
+        });
+    }
+
+    private void handleCreateServer(ServerConnection source, String jsonPayload) {
+        apiService.createServer(jsonPayload)
+            .thenAccept(responseMsg -> {
+                server.getScheduler().buildTask(this, () -> {
+                    String message = "CREATION_RESPONSE:success:" + responseMsg;
+                    source.sendPluginMessage(channelIdentifier, message.getBytes(StandardCharsets.UTF_8));
+                }).schedule();
+            })
+            .exceptionally(ex -> {
+                server.getScheduler().buildTask(this, () -> {
+                    String errorMsg = "CREATION_RESPONSE:error:Failed to create server: " + ex.getCause().getMessage();
+                    source.sendPluginMessage(channelIdentifier, errorMsg.getBytes(StandardCharsets.UTF_8));
+                }).schedule();
+                return null;
+            });
+    }
+    
+    private void handleGetVersions(ServerConnection source, String project, String responseCommand) {
+        apiService.getPaperMCVersions(project).thenAccept(versions -> {
+            server.getScheduler().buildTask(this, () -> {
+                List<String> versionList = versions.get("versions").getAsJsonArray().asList()
+                        .stream().map(JsonElement::getAsString).collect(Collectors.toList());
+                String json = gson.toJson(versionList);
+                String responseMessage = responseCommand + ":" + json;
+                source.sendPluginMessage(channelIdentifier, responseMessage.getBytes(StandardCharsets.UTF_8));
+            }).schedule();
+        }).exceptionally(ex -> {
+             logger.error("Failed to get versions for " + project, ex);
+             return null;
+        });
+    }
+
+    private void handleGetBuilds(ServerConnection source, String project, String version, String responseCommand) {
+        apiService.getPaperMCBuilds(project, version).thenAccept(builds -> {
+             server.getScheduler().buildTask(this, () -> {
+                 List<Integer> buildList = builds.getAsJsonObject("builds").getAsJsonArray().asList()
+                         .stream().map(e -> e.getAsJsonObject().get("build").getAsInt()).collect(Collectors.toList());
+                 String json = gson.toJson(buildList);
+                 String responseMessage = responseCommand + ":" + json;
+                 source.sendPluginMessage(channelIdentifier, responseMessage.getBytes(StandardCharsets.UTF_8));
+             }).schedule();
+        }).exceptionally(ex -> {
+            logger.error("Failed to get builds for " + project + " v" + version, ex);
+            return null;
         });
     }
 
