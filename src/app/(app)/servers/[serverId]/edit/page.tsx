@@ -1212,7 +1212,7 @@ export default function EditServerPage() {
                                         </div>
                                          <div>
                                             <Label htmlFor="toml-servers">Servers</Label>
-                                            <p className="text-xs text-muted-foreground mb-1">TOML configuration for backend servers. E.g., lobby = "127.0.0.1:25567"</p>
+                                            <p className="text-xs text-muted-foreground mb-1">TOML configuration for backend servers. E.g., hub = "127.0.0.1:25566"</p>
                                             <Textarea
                                                 id="toml-servers"
                                                 value={serversTomlString}
@@ -1225,7 +1225,7 @@ export default function EditServerPage() {
                                         </div>
                                          <div>
                                             <Label htmlFor="toml-forced-hosts">Forced Hosts</Label>
-                                            <p className="text-xs text-muted-foreground mb-1">Force a domain to a specific server. E.g., "hub.example.com" = ["lobby"]</p>
+                                            <p className="text-xs text-muted-foreground mb-1">Force a domain to a specific server. E.g., "hub.example.com" = ["hub"]</p>
                                             <Textarea
                                                 id="toml-forced-hosts"
                                                 value={forcedHostsTomlString}

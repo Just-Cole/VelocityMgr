@@ -124,12 +124,11 @@ sample-players-in-ping = false
 enable-player-address-logging = true
 
 [servers]
-# Configure your servers here. Each key represents the server's name, and the value
-# represents the IP address of the server to connect to.
-try = []
+try = [ "hub" ]
+hub = "127.0.0.1:25566"
 
 [forced-hosts]
-# Configure your forced hosts here.
+"hub.example.com" = [ "hub" ]
 
 [advanced]
 # How large a Minecraft packet has to be before we compress it. Setting this to zero will
@@ -195,7 +194,7 @@ kick-after-rate-limited-tab-completes = 0
 # Whether to enable responding to GameSpy 4 query responses or not.
 enabled = false
 # If query is enabled, on what port should the query protocol listen on?
-port = 25565
+port = 25577
 # This is the map name that is reported to the query services.
 map = "Velocity"
 # Whether plugins should be shown in query response by default or not
