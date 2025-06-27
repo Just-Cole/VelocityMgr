@@ -4,11 +4,13 @@ const { app, BrowserWindow, shell } = require('electron');
 const path = require('path');
 const { fork } = require('child_process');
 const fs =require('fs');
+const waitOn = require('wait-on');
 
 const isDev = process.env.NODE_ENV !== 'production';
 
 let mainWindow;
 let backendProcess;
+let frontendProcess;
 
 // Load config.json to get ports
 let config = { backend_port: 3005, frontend_port: 9002 };
@@ -27,7 +29,6 @@ const backendPort = config.backend_port || 3005;
 function startBackend() {
   const backendPath = path.join(__dirname, 'src', 'backend', 'src', 'index.js');
   
-  // Set the BACKEND_PORT env var for the child process
   const env = { ...process.env, BACKEND_PORT: backendPort };
   
   backendProcess = fork(backendPath, [], { silent: true, env });
@@ -40,11 +41,29 @@ function startBackend() {
   });
   backendProcess.on('exit', (code) => {
     console.log(`Backend process exited with code ${code}`);
-    // Optionally, you can try to restart it or notify the user
   });
 }
 
-function createWindow() {
+function startFrontendProd() {
+    const nextCliPath = path.join(__dirname, 'node_modules', 'next', 'dist', 'bin', 'next');
+    frontendProcess = fork(nextCliPath, ['start', '-p', frontendPort], {
+        cwd: __dirname, // The Next.js project root in the packaged app
+        silent: true
+    });
+
+    frontendProcess.stdout.on('data', (data) => {
+        console.log(`Frontend STDOUT: ${data.toString()}`);
+    });
+    frontendProcess.stderr.on('data', (data) => {
+        console.error(`Frontend STDERR: ${data.toString()}`);
+    });
+    frontendProcess.on('exit', (code) => {
+        console.log(`Frontend process exited with code ${code}`);
+    });
+}
+
+
+async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -55,11 +74,18 @@ function createWindow() {
     },
   });
 
-  // In development, load from the Next.js dev server.
-  // In production, load the static HTML file.
-  const startUrl = isDev
-    ? `http://localhost:${frontendPort}`
-    : `file://${path.join(__dirname, 'dist', 'index.html')}`; // This path assumes Next.js static export
+  const startUrl = `http://localhost:${frontendPort}`;
+  
+  if (!isDev) {
+    try {
+      // Wait for the Next.js server to be ready before loading the URL
+      await waitOn({ resources: [startUrl], timeout: 30000 });
+    } catch (err) {
+      console.error('Error waiting for frontend to start:', err);
+      // You could show an error window to the user here
+      return;
+    }
+  }
 
   mainWindow.loadURL(startUrl);
 
@@ -79,14 +105,19 @@ function createWindow() {
 }
 
 app.on('ready', () => {
-  console.log('App is ready. Starting backend and creating window...');
+  console.log('App is ready. Starting servers and creating window...');
   startBackend();
+  
+  if (!isDev) {
+    startFrontendProd();
+  }
+  
+  // This is async, but we don't need to await it here.
+  // It will create the window and load the URL when ready.
   createWindow();
 });
 
 app.on('window-all-closed', () => {
-  // On macOS it's common for applications and their menu bar
-  // to stay active until the user quits explicitly with Cmd + Q
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -98,11 +129,13 @@ app.on('will-quit', () => {
     console.log('Quitting app, terminating backend process...');
     backendProcess.kill();
   }
+  if (frontendProcess) {
+    console.log('Quitting app, terminating frontend process...');
+    frontendProcess.kill();
+  }
 });
 
 app.on('activate', () => {
-  // On macOS it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
   if (mainWindow === null) {
     createWindow();
   }
