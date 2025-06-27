@@ -47,9 +47,11 @@ function startBackend() {
 
 function startFrontendProd() {
     const nextCliPath = path.join(__dirname, 'node_modules', 'next', 'dist', 'bin', 'next');
+    const env = { ...process.env, BACKEND_PORT: backendPort };
     frontendProcess = fork(nextCliPath, ['start', '-p', frontendPort], {
         cwd: __dirname, // The Next.js project root in the packaged app
-        silent: true
+        silent: true,
+        env: env,
     });
 
     frontendProcess.stdout.on('data', (data) => {
@@ -83,8 +85,7 @@ async function createWindow() {
       await waitOn({ resources: [startUrl], timeout: 30000 });
     } catch (err) {
       console.error('Error waiting for frontend to start:', err);
-      // You could show an error window to the user here
-      return;
+      // Don't return, allow it to try loading the URL so the user sees an error page.
     }
   }
 
