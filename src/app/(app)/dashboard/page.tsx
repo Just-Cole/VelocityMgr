@@ -351,6 +351,13 @@ export default function DashboardPage() {
                         <div className="flex flex-col">
                           <span className="truncate" title={server.name}>{server.name}</span>
                           <span className="text-xs text-muted-foreground">{server.ip}:{server.port}</span>
+                          {server.tags && server.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {server.tags.map(tag => (
+                                <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="hidden md:table-cell">{server.connectedPlayers?.length || 0} / {server.maxPlayers}</TableCell>

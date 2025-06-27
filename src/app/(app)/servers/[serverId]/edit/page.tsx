@@ -41,7 +41,8 @@ import {
   ArrowLeft,
   Download,
   ArchiveRestore,
-  ListX
+  ListX,
+  X as XIcon,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -80,6 +81,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 
 // Mock templates, replace with API call if needed later
@@ -192,6 +194,8 @@ export default function EditServerPage() {
   const [maxRam, setMaxRam] = React.useState(RAM_OPTIONS[2].value); // Default to 2GB
   const [launchArgs, setLaunchArgs] = React.useState("");
   const [maxPlayers, setMaxPlayers] = React.useState<number | string>("");
+  const [tags, setTags] = React.useState<string[]>([]);
+  const [tagInput, setTagInput] = React.useState("");
 
   // Backups state
   const [backups, setBackups] = React.useState<Backup[]>([]);
@@ -298,6 +302,7 @@ export default function EditServerPage() {
           setMaxRam(normalizeRamToOption(foundServer.maxRam));
           setLaunchArgs(foundServer.launchArgs || "");
           setMaxPlayers(foundServer.maxPlayers || 20);
+          setTags(foundServer.tags || []);
           
           if (foundServer.templateId) {
             const foundTemplate = MOCK_TEMPLATES.find(t => t.id === foundServer.templateId);
@@ -515,6 +520,7 @@ export default function EditServerPage() {
       maxRam,
       launchArgs,
       maxPlayers: parseInt(String(maxPlayers), 10),
+      tags,
     };
 
     try {
@@ -870,6 +876,18 @@ export default function EditServerPage() {
       }
   };
 
+  const handleAddTag = () => {
+    const newTag = tagInput.trim();
+    if (newTag && !tags.includes(newTag)) {
+      setTags([...tags, newTag]);
+    }
+    setTagInput("");
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setTags(tags.filter(tag => tag !== tagToRemove));
+  };
+
 
   const propertyCategories: Record<string, string[]> = {
     'General': ['motd', 'gamemode', 'difficulty', 'force-gamemode'],
@@ -1093,6 +1111,43 @@ export default function EditServerPage() {
                   <div>
                     <Label htmlFor="maxPlayers">Max Players</Label>
                     <Input id="maxPlayers" type="number" value={maxPlayers} onChange={(e) => setMaxPlayers(e.target.value === "" ? "" : parseInt(e.target.value,10))} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label htmlFor="tags-input">Tags</Label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Input
+                        id="tags-input"
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddTag();
+                          }
+                        }}
+                        placeholder="Add a tag and press Enter"
+                        className="flex-grow"
+                        disabled={!canEdit}
+                      />
+                      <Button type="button" onClick={handleAddTag} disabled={!canEdit}>Add Tag</Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mt-2 min-h-[24px]">
+                      {tags.map(tag => (
+                        <Badge key={tag} variant="secondary" className="flex items-center gap-1.5">
+                          {tag}
+                          {canEdit && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveTag(tag)}
+                              className="rounded-full hover:bg-muted-foreground/20 p-0.5"
+                              aria-label={`Remove tag ${tag}`}
+                            >
+                              <XIcon className="h-3 w-3" />
+                            </button>
+                          )}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 {template && (
                   <div>
@@ -1740,6 +1795,7 @@ export default function EditServerPage() {
     
 
     
+
 
 
 

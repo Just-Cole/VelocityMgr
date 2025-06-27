@@ -380,6 +380,10 @@ class IndexController {
                 servers[i].pid = undefined;
                 changesMade = true;
             }
+             if (servers[i].tags === undefined) {
+              servers[i].tags = [];
+              changesMade = true;
+            }
         }
         if (changesMade) {
             this._writeServers(servers);
@@ -741,7 +745,7 @@ class IndexController {
             port,
             serverType,
         } = req.body;
-        let { serverVersion, paperBuild, velocityBuild } = req.body;
+        let { serverVersion } = req.body;
 
         if (!serverName || !port || !serverType || !serverVersion) {
             return res.status(400).json({
@@ -764,20 +768,18 @@ class IndexController {
 
             const isPaper = serverType === 'PaperMC';
             const apiProjectName = isPaper ? 'paper' : 'velocity';
-            let buildNumber = isPaper ? paperBuild : velocityBuild;
-
-            if (!buildNumber) {
-                console.log(`[Create Server] Build not specified for ${serverType} ${serverVersion}. Fetching latest build...`);
-                const buildsResponse = await httpsGetJson(`https://api.papermc.io/v2/projects/${apiProjectName}/versions/${serverVersion}/builds`);
-                const latestBuildDetails = buildsResponse.builds.pop(); // Last in array is latest
-                if (!latestBuildDetails) {
-                    return res.status(404).json({ message: `Could not find any builds for ${serverType} version ${serverVersion}. Please check the version number.` });
-                }
-                buildNumber = latestBuildDetails.build;
-                // Use the full version string from the API response for accuracy
-                serverVersion = buildsResponse.version; 
-                console.log(`[Create Server] Found latest build for ${serverVersion}: ${buildNumber}`);
+            
+            console.log(`[Create Server] Build not specified for ${serverType} ${serverVersion}. Fetching latest build...`);
+            const buildsResponse = await httpsGetJson(`https://api.papermc.io/v2/projects/${apiProjectName}/versions/${serverVersion}/builds`);
+            const latestBuildDetails = buildsResponse.builds.pop(); // Last in array is latest
+            if (!latestBuildDetails) {
+                return res.status(404).json({ message: `Could not find any builds for ${serverType} version ${serverVersion}. Please check the version number.` });
             }
+            const buildNumber = latestBuildDetails.build;
+            // Use the full version string from the API response for accuracy
+            serverVersion = buildsResponse.version; 
+            console.log(`[Create Server] Found latest build for ${serverVersion}: ${buildNumber}`);
+            
 
             const newServerId = uuidv4();
             const newServer = {
@@ -795,6 +797,7 @@ class IndexController {
                 minRam: '1024M',
                 maxRam: '2048M',
                 description: `A new ${serverType} server.`,
+                tags: [],
             };
 
             const serverFolderPath = this._getServerFolderPath(newServer);
@@ -1049,6 +1052,10 @@ class IndexController {
             serverToRestore.cpuUsage = 0;
             serverToRestore.ramUsage = 0;
             serverToRestore.currentRam = 0;
+            if (serverToRestore.tags === undefined) {
+              serverToRestore.tags = [];
+            }
+
 
             const originalPath = this._getServerFolderPath(serverToRestore);
             const recoveredPath = path.join(RECOVERY_DIR, recoveryFolderName);
@@ -1540,6 +1547,16 @@ class IndexController {
             const updatedServer = { ...originalServer,
                 ...updates
             };
+
+             // Explicitly handle tags to ensure it's an array
+            if (updates.tags !== undefined) {
+              if (Array.isArray(updates.tags)) {
+                updatedServer.tags = updates.tags;
+              } else {
+                // Handle cases where it might not be an array, though client should send one
+                updatedServer.tags = []; 
+              }
+            }
 
             // For non-proxy servers, update relevant properties in server.properties
             if (updates.port !== undefined && updates.port !== originalServer.port) {
@@ -2082,6 +2099,7 @@ class IndexController {
             cpuUsage: 0,
             ramUsage: 0,
             currentRam: 0,
+            tags: [],
         };
 
         try {
@@ -2190,6 +2208,7 @@ class IndexController {
                     status: 'Offline',
                     logoUrl: versionDetails.project?.icon_url || null,
                     consoleLogFile: consoleLogFilePath,
+                    tags: [],
                 };
                 finalServers[serverIndex] = finalServerData;
                 this._writeServers(finalServers);
