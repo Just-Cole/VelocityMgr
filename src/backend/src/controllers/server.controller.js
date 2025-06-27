@@ -156,6 +156,35 @@ class ServerController {
 
             if (newServer.softwareType === 'PaperMC') {
                 await this.indexController._updateServerPropertiesPort(newServer, newServer.port);
+            } else if (newServer.softwareType === 'Velocity') {
+                const tomlPath = path.join(serverFolderPath, 'velocity.toml');
+                if (!fs.existsSync(tomlPath)) {
+                    console.log(`[Create Server] Creating default velocity.toml for new proxy ${newServer.name}`);
+                    const defaultConfig = {
+                        bind: `0.0.0.0:${newServer.port}`,
+                        motd: `'A Velocity Server'`,
+                        'show-max-players': 500,
+                        'online-mode': true,
+                        servers: {
+                            // Example server, user will need to configure this
+                            lobby: '127.0.0.1:25566' 
+                        },
+                        try: ['lobby'],
+                        'player-info-forwarding-mode': 'modern', // The requested change
+                        forwarding: {
+                            'secret-file': 'forwarding.secret'
+                        }
+                    };
+                    
+                    const secretFilePath = path.join(serverFolderPath, 'forwarding.secret');
+                    if (!fs.existsSync(secretFilePath)) {
+                        const secret = crypto.randomBytes(12).toString('hex');
+                        await fsPromises.writeFile(secretFilePath, secret, 'utf-8');
+                        console.log(`[Create Server] Generated new forwarding.secret for proxy ${newServer.name}.`);
+                    }
+
+                    await fsPromises.writeFile(tomlPath, TOML.stringify(defaultConfig), 'utf-8');
+                }
             }
             
             // --- Copy companion plugin ---
