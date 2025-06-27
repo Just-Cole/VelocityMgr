@@ -378,31 +378,33 @@ class ServerController {
     
     async createServer(req, res, next) {
         try {
-            const { serverType, serverName } = req.body;
+            const { serverType, createHubServer, hubVersion } = req.body;
     
             if (serverType === 'Velocity') {
                 const proxyServer = await this._internalCreateServer(req.body);
-    
-                const allServers = this.indexController._readServers();
-                const hubExists = allServers.some(s => s.name === 'Hub' || s.port === 25566);
                 let hubCreationMessage = '';
-    
-                if (!hubExists) {
-                    const hubDetails = {
-                        serverName: 'Hub',
-                        port: 25566,
-                        serverType: 'PaperMC',
-                        serverVersion: null, // Let internal creator find latest
-                    };
-                    try {
-                        const hubServer = await this._internalCreateServer(hubDetails);
-                        await this.indexController._syncVelocitySecret(hubServer, proxyServer);
-                        hubCreationMessage = 'Companion Hub server was also created and linked.';
-                    } catch (hubError) {
-                        hubCreationMessage = `Warning: Failed to create companion Hub server. Error: ${hubError.message}`;
+
+                if (createHubServer && hubVersion) {
+                    const allServers = this.indexController._readServers();
+                    const hubExists = allServers.some(s => s.name === 'Hub' || s.port === 25566);
+        
+                    if (!hubExists) {
+                        const hubDetails = {
+                            serverName: 'Hub',
+                            port: 25566,
+                            serverType: 'PaperMC',
+                            serverVersion: hubVersion,
+                        };
+                        try {
+                            const hubServer = await this._internalCreateServer(hubDetails);
+                            await this.indexController._syncVelocitySecret(hubServer, proxyServer);
+                            hubCreationMessage = 'Companion Hub server was also created and linked.';
+                        } catch (hubError) {
+                            hubCreationMessage = `Warning: Failed to create companion Hub server. Error: ${hubError.message}`;
+                        }
+                    } else {
+                        hubCreationMessage = 'A server named "Hub" or using port 25566 already exists. Skipping Hub creation.';
                     }
-                } else {
-                    hubCreationMessage = 'A server named "Hub" or using port 25566 already exists. Skipping Hub creation.';
                 }
                 
                 res.status(201).json({

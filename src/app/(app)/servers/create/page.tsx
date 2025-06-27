@@ -27,6 +27,8 @@ import type { ModrinthProject, ModrinthVersion } from "@/lib/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { getRamSuggestion } from '@/actions/modpack';
+import { Checkbox } from "@/components/ui/checkbox";
+
 
 const RAM_OPTIONS = [
   { value: "512M", label: "512 MB" },
@@ -64,6 +66,10 @@ const serverSchema = z.object({
   modpackVersionId: z.string().optional(),
   modpackProjectId: z.string().optional(),
 
+  // Companion Hub fields
+  createHubServer: z.boolean().optional(),
+  hubVersion: z.string().optional(),
+
 }).superRefine((data, ctx) => {
   if (data.networkSetupType === "single_server") {
     if (!data.name || data.name.length < 3) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Server name must be at least 3 characters", path: ["name"] });
@@ -73,6 +79,9 @@ const serverSchema = z.object({
       if (!data.version) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Minecraft version is required for PaperMC", path: ["version"] });
     } else if (data.serverType === "Velocity") {
       if (!data.velocityVersion) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Velocity version is required", path: ["velocityVersion"] });
+      if (data.createHubServer && !data.hubVersion) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Please select a version for the Hub server.", path: ["hubVersion"] });
+      }
     }
   } else if (data.networkSetupType === "upload_zip") {
     if (!data.name || data.name.length < 3) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Server name must be at least 3 characters", path: ["name"] });
@@ -143,15 +152,19 @@ export default function CreateServerPage() {
       jarFileName: "server.jar",
       minRam: "1024M",
       maxRam: "2048M",
+      createHubServer: true,
+      hubVersion: "",
     },
   });
 
   const selectedNetworkSetupType = watch("networkSetupType");
   const selectedServerType = watch("serverType");
+  const createHubFlag = watch("createHubServer");
 
-  // Fetch PaperMC versions
+  // Fetch PaperMC versions for PaperMC creation or Hub creation
   React.useEffect(() => {
-    if (selectedNetworkSetupType !== "single_server" || selectedServerType !== "PaperMC" || minecraftVersions.length > 0) return;
+    const shouldFetch = selectedNetworkSetupType === 'single_server' && (selectedServerType === 'PaperMC' || selectedServerType === 'Velocity');
+    if (!shouldFetch || minecraftVersions.length > 0) return;
 
     const fetchMcVersions = async () => {
       setIsLoadingMinecraftVersions(true);
@@ -159,7 +172,12 @@ export default function CreateServerPage() {
         const response = await fetch('/api/papermc/versions/paper');
         if (!response.ok) throw new Error('Failed to fetch PaperMC versions');
         const data: ApiVersionResponse = await response.json();
-        setMinecraftVersions(data.versions.reverse() || []);
+        const versions = data.versions.reverse() || [];
+        setMinecraftVersions(versions);
+        // Set default hub version if not already set
+        if (createHubFlag && versions.length > 0 && !watch('hubVersion')) {
+            setValue('hubVersion', versions[0]);
+        }
       } catch (err) {
         toast({ title: "Error", description: "Could not load PaperMC versions.", variant: "destructive" });
         setMinecraftVersions([]);
@@ -168,7 +186,7 @@ export default function CreateServerPage() {
       }
     };
     fetchMcVersions();
-  }, [selectedNetworkSetupType, selectedServerType, minecraftVersions.length, toast]);
+  }, [selectedNetworkSetupType, selectedServerType, createHubFlag, minecraftVersions.length, toast, watch, setValue]);
 
   // Fetch Velocity versions
   React.useEffect(() => {
@@ -354,7 +372,8 @@ export default function CreateServerPage() {
         port: data.port,
         serverType: data.serverType,
         serverVersion: data.serverType === 'PaperMC' ? data.version : data.velocityVersion,
-        // No build number is sent. The backend will fetch the latest.
+        createHubServer: data.createHubServer,
+        hubVersion: data.hubVersion,
       };
     }
     
@@ -632,6 +651,39 @@ export default function CreateServerPage() {
                         )} />
                       <p className="text-xs text-muted-foreground mt-1">The latest build for this version will be used.</p>
                       {errors.velocityVersion && <p className="text-sm text-destructive mt-1">{errors.velocityVersion.message}</p>}
+                    </div>
+
+                    <div className="mt-4 space-y-4 rounded-md border p-4 bg-muted/50">
+                        <h3 className="text-sm font-medium">Companion Server</h3>
+                        <Controller
+                            name="createHubServer"
+                            control={control}
+                            render={({ field }) => (
+                                <div className="flex items-center space-x-2">
+                                    <Checkbox
+                                        id="createHubServer"
+                                        checked={field.value}
+                                        onCheckedChange={field.onChange}
+                                    />
+                                    <Label htmlFor="createHubServer" className="font-normal leading-snug">
+                                        Automatically create a default backend 'Hub' server on port 25566.
+                                    </Label>
+                                </div>
+                            )}
+                        />
+                        {createHubFlag && (
+                            <div>
+                                <Label htmlFor="hubVersion" className="flex items-center">Hub Minecraft Version {isLoadingMinecraftVersions && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}</Label>
+                                <Controller name="hubVersion" control={control} render={({ field }) => (
+                                    <Select onValueChange={field.onChange} value={field.value} disabled={isLoadingMinecraftVersions || minecraftVersions.length === 0}>
+                                        <SelectTrigger id="hubVersion" className="mt-1"><SelectValue placeholder={isLoadingMinecraftVersions ? "Loading versions..." : (minecraftVersions.length === 0 ? "No versions available" : "Select a version")} /></SelectTrigger>
+                                        <SelectContent>{minecraftVersions.map((version) => ( <SelectItem key={`hub-${version}`} value={version}>{version}</SelectItem> ))}</SelectContent>
+                                    </Select>
+                                )} />
+                                <p className="text-xs text-muted-foreground mt-1">The latest build for this version will be used for the Hub.</p>
+                                {errors.hubVersion && <p className="text-sm text-destructive mt-1">{errors.hubVersion.message}</p>}
+                            </div>
+                        )}
                     </div>
                   </>
                 )}
