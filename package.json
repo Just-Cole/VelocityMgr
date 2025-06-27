@@ -17,7 +17,8 @@
     "typecheck": "tsc --noEmit",
     "electron:dev": "concurrently -k \"npm:dev:backend\" \"npm:dev:frontend\" \"wait-on http://localhost:9002 && electron .\"",
     "preelectron:build": "npm run build",
-    "electron:build": "electron-builder"
+    "electron:build": "electron-builder",
+    "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.8.0",
