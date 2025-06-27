@@ -2,6 +2,8 @@
   "name": "nextn",
   "version": "0.1.0",
   "private": true,
+  "description": "Velocity Manager is a web-based application for managing game servers.",
+  "author": "Velocity Manager Team",
   "main": "electron.js",
   "scripts": {
     "dev": "concurrently \"npm:dev:frontend\" \"npm:dev:backend\"",

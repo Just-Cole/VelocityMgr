@@ -14,6 +14,7 @@ Velocity Manager is a comprehensive, web-based application designed to simplify 
 *   **Server Management:**
     *   **Live Console:** View real-time server console output and send commands directly from the web UI.
     *   **Player List:** See currently connected players, with options for moderation (kick, ban, message).
+    *   **Banned Players List:** View and manage the list of banned players for a server.
     *   **Resource Monitoring:** View live CPU and RAM usage for each server.
     *   **AI Log Analysis:** Use the AI assistant to diagnose server logs for critical errors and get easy-to-understand explanations and suggested fixes.
     *   **Server Actions:** Start, Stop, and Restart servers directly from the dashboard or management page.
@@ -24,12 +25,13 @@ Velocity Manager is a comprehensive, web-based application designed to simplify 
     *   **Backup Management:** Create on-demand backups, restore a server to a previous state, download, or delete old backups.
     *   **Plugin Management:**
         *   List installed plugins and toggle their enabled/disabled state.
-        *   Browse and install new plugins directly from SpigotMC's resources.
+        *   Browse and install new plugins directly from SpigotMC.
         *   Uninstall plugins with a single click.
 *   **Administration & Security:**
     *   **User & Role Management:** A robust role-based access control (RBAC) system. Create custom roles, assign fine-grained permissions (e.g., `view_logs`, `start_stop_servers`), and assign roles to users.
     *   **Server Recovery:** Deleted servers are moved to a recovery area, allowing you to restore them or delete them permanently.
     *   **Profile Management:** Users can manage their own account and change their password.
+*   **Desktop Application:** The entire application can be built into a standalone desktop app for Windows, macOS, and Linux using Electron.
 
 ## 🚀 Tech Stack
 
@@ -44,6 +46,9 @@ Velocity Manager is a comprehensive, web-based application designed to simplify 
 *   **AI Functionality:**
     *   Google Genkit
     *   Google AI (Gemini Models) for diagnostics and recommendations.
+*   **Desktop Packaging:**
+    *   Electron
+    *   Electron Builder
 
 ## 🏁 Getting Started
 
@@ -69,9 +74,9 @@ Follow these instructions to get a copy of the project up and running on your lo
     npm install
     ```
 
-### Running the Application
+### Running in Development Mode
 
-You need to run both the frontend and backend servers concurrently. The project is set up to do this with a single command.
+This is the standard way to run the application for development. It runs the frontend and backend as separate processes with hot-reloading.
 
 Open a terminal in the project root directory and run:
 
@@ -84,6 +89,26 @@ This will:
 *   Start the **Frontend Development Server** (typically on `http://localhost:9002`).
 
 Once both servers are running, open your browser and navigate to the frontend URL displayed in the terminal.
+
+### Running in Desktop (Electron) Mode
+
+This mode simulates the packaged desktop application. It's useful for testing desktop-specific functionality.
+
+```bash
+npm run electron:dev
+```
+
+This will start the backend, the frontend, and then launch the Electron app window which loads the frontend URL.
+
+### Building the Desktop Application
+
+To create a distributable desktop application (`.exe`, `.dmg`, etc.), run the following command:
+
+```bash
+npm run electron:build
+```
+
+This will create a `release` folder in your project root containing the packaged application for your operating system.
 
 ## 📂 Project Structure (Simplified)
 
@@ -109,7 +134,8 @@ Once both servers are running, open your browser and navigate to the frontend UR
 │   ├── lib/                 # Shared utilities, constants, types
 │   ├── spigot-plugin/       # Source for the Spigot companion plugin
 │   └── velocity-plugin/     # Source for the Velocity companion plugin
-├── .env                     # Environment variables (create if needed)
+├── electron.js              # Main process script for the Electron desktop app
+├── config.json              # Global application settings (ports, etc.)
 ├── next.config.ts           # Next.js configuration
 ├── package.json             # Project dependencies and scripts
 └── README.md                # This file
