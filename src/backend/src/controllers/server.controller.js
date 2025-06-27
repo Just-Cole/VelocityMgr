@@ -1,4 +1,5 @@
 
+
 const fs = require('fs');
 const fsPromises = require('fs').promises;
 const path = require('path');
@@ -78,6 +79,8 @@ force-key-authentication = true
 # authentication server, the player is kicked. This disallows some VPN and proxy
 # connections but is a weak form of protection.
 prevent-client-proxy-connections = false
+
+[forwarding]
 # Should we forward IP addresses and other data to backend servers?
 # Available options:
 # - "none":        No forwarding will be done. All players will appear to be connecting
@@ -89,125 +92,28 @@ prevent-client-proxy-connections = false
 #                  unable to implement network level firewalling (on a shared host).
 # - "modern":      Forward player IPs and UUIDs as part of the login process using
 #                  Velocity's native forwarding. Only applicable for Minecraft 1.13 or higher.
-player-info-forwarding-mode = "MODERN"
+player-info-forwarding-mode = "modern"
 # If you are using modern or BungeeGuard IP forwarding, configure a file that contains a unique secret here.
 # The file is expected to be UTF-8 encoded and not empty.
 forwarding-secret-file = "forwarding.secret"
-# Announce whether or not your server supports Forge. If you run a modded server, we
-# suggest turning this on.
-# 
-# If your network runs one modpack consistently, consider using ping-passthrough = "mods"
-# instead for a nicer display in the server list.
-announce-forge = false
-# If enabled (default is false) and the proxy is in online mode, Velocity will kick
-# any existing player who is online if a duplicate connection attempt is made.
-kick-existing-players = false
-# Should Velocity pass server list ping requests to a backend server?
-# Available options:
-# - "disabled":    No pass-through will be done. The velocity.toml and server-icon.png
-#                  will determine the initial server list ping response.
-# - "mods":        Passes only the mod list from your backend server into the response.
-#                  The first server in your try list (or forced host) with a mod list will be
-#                  used. If no backend servers can be contacted, Velocity won't display any
-#                  mod information.
-# - "description": Uses the description and mod list from the backend server. The first
-#                  server in the try (or forced host) list that responds is used for the
-#                  description and mod list.
-# - "all":         Uses the backend server's response as the proxy response. The Velocity
-#                  configuration is used if no servers could be contacted.
-ping-passthrough = "DISABLED"
-# If enabled (default is false), then a sample of the online players on the proxy will be visible
-# when hovering over the player count in the server list.
-# This doesn't have any effect when ping passthrough is set to either "description" or "all".
-sample-players-in-ping = false
-# If not enabled (default is true) player IP addresses will be replaced by <ip address withheld> in logs
-enable-player-address-logging = true
 
 [servers]
-# Configure your servers here. Each key represents the server's name, and the value
-# represents the IP address of the server to connect to.
-hub = "127.0.0.1:25566"
-
 # In what order we should try servers when a player logs in or is kicked from a server.
-try = [
-    "hub"
-]
+# The servers listed here must correspond to a server listed above.
+# try = []
 
 [forced-hosts]
 # Configure your forced hosts here.
-"hub.example.com" = [
-    "hub"
-]
+# "lobby.example.com" = ["lobby"]
 
 [advanced]
 # How large a Minecraft packet has to be before we compress it. Setting this to zero will
 # compress all packets, and setting it to -1 will disable compression entirely.
 compression-threshold = 256
-# How much compression should be done (from 0-9). The default is -1, which uses the
-# default level of 6.
-compression-level = -1
-# How fast (in milliseconds) are clients allowed to connect after the last connection? By
-# default, this is three seconds. Disable this by setting this to 0.
-login-ratelimit = 3000
-# Specify a custom timeout for connection timeouts here. The default is five seconds.
-connection-timeout = 5000
-# Specify a read timeout for connections here. The default is 30 seconds.
-read-timeout = 30000
-# Enables compatibility with HAProxy's PROXY protocol. If you don't know what this is for, then
-# don't enable it.
-haproxy-protocol = false
-# Enables TCP fast open support on the proxy. Requires the proxy to run on Linux.
-tcp-fast-open = false
-# Enables BungeeCord plugin messaging channel support on Velocity.
-bungee-plugin-message-channel = true
-# Shows ping requests to the proxy from clients.
-show-ping-requests = false
-# By default, Velocity will attempt to gracefully handle situations where the user unexpectedly
-# loses connection to the server without an explicit disconnect message by attempting to fall the
-# user back, except in the case of read timeouts. BungeeCord will disconnect the user instead. You
-# can disable this setting to use the BungeeCord behavior.
-failover-on-unexpected-server-disconnect = true
-# Declares the proxy commands to 1.13+ clients.
-announce-proxy-commands = true
-# Enables the logging of commands
-log-command-executions = false
-# Enables logging of player connections when connecting to the proxy, switching servers
-# and disconnecting from the proxy.
-log-player-connections = true
-# Allows players transferred from other hosts via the
-# Transfer packet (Minecraft 1.20.5) to be received.
-accepts-transfers = false
-# Enables support for SO_REUSEPORT. This may help the proxy scale better on multicore systems
-# with a lot of incoming connections, and provide better CPU utilization than the existing
-# strategy of having a single thread accepting connections and distributing them to worker
-# threads. Disabled by default. Requires Linux or macOS.
-enable-reuse-port = false
-# How fast (in milliseconds) are clients allowed to send commands after the last command
-# By default this is 50ms (20 commands per second)
-command-rate-limit = 50
-# Should we forward commands to the backend upon being rate limited?
-# This will forward the command to the server instead of processing it on the proxy.
-# Since most server implementations have a rate limit, this will prevent the player
-# from being able to send excessive commands to the server.
-forward-commands-if-rate-limited = true
-# How many commands are allowed to be sent after the rate limit is hit before the player is kicked?
-# Setting this to 0 or lower will disable this feature.
-kick-after-rate-limited-commands = 0
-# How fast (in milliseconds) are clients allowed to send tab completions after the last tab completion
-tab-complete-rate-limit = 10
-# How many tab completions are allowed to be sent after the rate limit is hit before the player is kicked?
-# Setting this to 0 or lower will disable this feature.
-kick-after-rate-limited-tab-completes = 0
 
 [query]
 # Whether to enable responding to GameSpy 4 query responses or not.
 enabled = false
-# If query is enabled, on what port should the query protocol listen on?
-port = 25577
-# This is the map name that is reported to the query services.
-map = "Velocity"
-# Whether plugins should be shown in query response by default or not
-show-plugins = false
 `;
 
 
@@ -228,39 +134,32 @@ class ServerController {
     async _addServerToProxyConfig(serverToAdd, proxyServer) {
         try {
             const tomlPath = path.join(this.indexController._getServerFolderPath(proxyServer), 'velocity.toml');
-            let tomlContent = '';
+            let tomlConfig = {};
+
             if (fs.existsSync(tomlPath)) {
-                tomlContent = await fsPromises.readFile(tomlPath, 'utf8');
+                const tomlContent = await fsPromises.readFile(tomlPath, 'utf8');
+                tomlConfig = TOML.parse(tomlContent);
             } else {
                 return; // No config to add to
             }
     
-            let tomlLines = tomlContent.split(/\r?\n/);
+            if (!tomlConfig.servers) tomlConfig.servers = {};
+            if (!tomlConfig['forced-hosts']) tomlConfig['forced-hosts'] = {};
+
             const serverEntryName = serverToAdd.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-            const newServerLine = `${serverEntryName} = "${serverToAdd.ip}:${serverToAdd.port}"`;
-            const newForcedHostLine = `"${serverEntryName}.example.com" = ["${serverEntryName}"]`;
-    
-            const insertIntoSection = (lines, sectionName, lineToInsert) => {
-                const sectionIndex = lines.findIndex(line => line.trim() === `[${sectionName}]`);
-                if (sectionIndex !== -1) {
-                    let endOfSectionIndex = lines.findIndex((line, index) => index > sectionIndex && line.trim().startsWith('['));
-                    if (endOfSectionIndex === -1) endOfSectionIndex = lines.length;
-                    
-                    const existingEntryRegex = new RegExp(`^\\s*${serverEntryName}\\s*=`);
-                    const hasEntry = lines.slice(sectionIndex, endOfSectionIndex).some(line => existingEntryRegex.test(line));
-    
-                    if (!hasEntry) {
-                        lines.splice(endOfSectionIndex, 0, lineToInsert);
-                    }
-                } else {
-                    lines.push('', `[${sectionName}]`, lineToInsert);
-                }
-            };
+            tomlConfig.servers[serverEntryName] = `${serverToAdd.ip}:${serverToAdd.port}`;
             
-            insertIntoSection(tomlLines, 'servers', newServerLine);
-            insertIntoSection(tomlLines, 'forced-hosts', newForcedHostLine);
+            const forcedHostKey = `${serverEntryName}.example.com`;
+            tomlConfig['forced-hosts'][forcedHostKey] = [serverEntryName];
+
+            if (!tomlConfig.try) {
+                tomlConfig.try = [];
+            }
+            if (tomlConfig.try.length === 0) {
+                tomlConfig.try.push(serverEntryName);
+            }
     
-            await fsPromises.writeFile(tomlPath, tomlLines.join('\n'), 'utf8');
+            await fsPromises.writeFile(tomlPath, TOML.stringify(tomlConfig), 'utf8');
             console.log(`[Link Server] Successfully added new server '${serverToAdd.name}' to proxy '${proxyServer.name}' config.`);
         } catch (tomlError) {
             console.error(`[Link Server] Failed to update proxy config for new server:`, tomlError);
@@ -273,6 +172,7 @@ class ServerController {
             port,
             serverType,
         } = serverDetails;
+    
         let { serverVersion } = serverDetails;
     
         try {
@@ -298,7 +198,7 @@ class ServerController {
                 throw new Error(`Could not find any builds for ${serverType} version ${serverVersion}.`);
             }
             const buildNumber = latestBuildDetails.build;
-            serverVersion = buildsResponse.version;
+            const fullVersion = buildsResponse.version; // e.g. 1.20, not 1.20.4
     
             const newServer = {
                 id: uuidv4(),
@@ -321,10 +221,10 @@ class ServerController {
             const serverFolderPath = this.indexController._getServerFolderPath(newServer);
             await fsPromises.mkdir(serverFolderPath, { recursive: true });
     
-            const downloadFileName = `${apiProjectName}-${serverVersion}-${buildNumber}.jar`;
+            const downloadFileName = `${apiProjectName}-${fullVersion}-${buildNumber}.jar`;
             const serverJarPath = path.join(serverFolderPath, downloadFileName);
             if (!fs.existsSync(serverJarPath)) {
-                const downloadUrl = `https://api.papermc.io/v2/projects/${apiProjectName}/versions/${serverVersion}/builds/${buildNumber}/downloads/${downloadFileName}`;
+                const downloadUrl = `https://api.papermc.io/v2/projects/${apiProjectName}/versions/${fullVersion}/builds/${buildNumber}/downloads/${downloadFileName}`;
                 await this.indexController.downloadFile(downloadUrl, serverFolderPath, downloadFileName);
             }
             newServer.jarFileName = downloadFileName;
@@ -397,6 +297,7 @@ class ServerController {
                         };
                         try {
                             const hubServer = await this._internalCreateServer(hubDetails);
+                            await this._addServerToProxyConfig(hubServer, proxyServer);
                             await this.indexController._syncVelocitySecret(hubServer, proxyServer);
                             hubCreationMessage = 'Companion Hub server was also created and linked.';
                         } catch (hubError) {
