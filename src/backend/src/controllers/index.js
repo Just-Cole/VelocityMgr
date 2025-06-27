@@ -875,9 +875,15 @@ class IndexController {
                         if (!tomlConfig.servers) {
                             tomlConfig.servers = {};
                         }
+                        if (!tomlConfig['forced-hosts']) {
+                            tomlConfig['forced-hosts'] = {};
+                        }
 
                         const serverEntryName = newServer.name.toLowerCase().replace(/[^a-z0-9]/g, '');
                         tomlConfig.servers[serverEntryName] = `${newServer.ip}:${newServer.port}`;
+
+                        const forcedHostKey = `${serverEntryName}.example.com`;
+                        tomlConfig['forced-hosts'][forcedHostKey] = [serverEntryName];
 
                         if (!tomlConfig.try) {
                             tomlConfig.try = [];
@@ -2232,9 +2238,12 @@ class IndexController {
                             tomlConfig = { servers: {} };
                         }
                         if (!tomlConfig.servers) tomlConfig.servers = {};
+                        if (!tomlConfig['forced-hosts']) tomlConfig['forced-hosts'] = {};
             
                         const serverEntryName = newServer.name.toLowerCase().replace(/[^a-z0-9]/g, '');
                         tomlConfig.servers[serverEntryName] = `${newServer.ip}:${newServer.port}`;
+                        const forcedHostKey = `${serverEntryName}.example.com`;
+                        tomlConfig['forced-hosts'][forcedHostKey] = [serverEntryName];
                         
                         if (!tomlConfig.try) tomlConfig.try = [];
                         if (tomlConfig.try.length === 0) tomlConfig.try.push(serverEntryName);
