@@ -1,8 +1,20 @@
 
 const path = require('path');
+const fs = require('fs');
 
 // Load environment variables from the root .env file
 require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '..', '.env') });
+
+// Load config.json
+let config = {};
+const configPath = path.resolve(__dirname, '..', '..', '..', 'config.json');
+if (fs.existsSync(configPath)) {
+    try {
+        config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    } catch (e) {
+        console.error('Error reading or parsing config.json:', e);
+    }
+}
 
 const express = require('express');
 const cors = require('cors');
@@ -11,8 +23,8 @@ const bodyParser = require('body-parser');
 const apiRouter = require('./routes/index.js'); 
 
 const app = express();
-// Use a specific environment variable for the backend port, defaulting to 3005
-const port = parseInt(process.env.BACKEND_PORT, 10) || 3005;
+// Use a specific environment variable for the backend port, or config.json, defaulting to 3005
+const port = parseInt(process.env.BACKEND_PORT, 10) || config.backend_port || 3005;
 const hostname = '0.0.0.0'; 
 
 app.use(cors());
