@@ -98,8 +98,8 @@ player-info-forwarding-mode = "MODERN"
 forwarding-secret-file = "forwarding.secret"
 
 [servers]
-# In what order we should try servers when a player logs in or is kicked from a server.
-# The servers listed here must correspond to a server listed above.
+# Configure your servers here. Each key represents the server's name, and the value
+# represents the IP address of the server to connect to.
 try = []
 
 [forced-hosts]
@@ -195,33 +195,67 @@ class ServerController {
     async _addServerToProxyConfig(serverToAdd, proxyServer) {
         try {
             const tomlPath = path.join(this.indexController._getServerFolderPath(proxyServer), 'velocity.toml');
-            let tomlConfig = {};
-
+            let tomlContent = '';
+            
             if (fs.existsSync(tomlPath)) {
-                const tomlContent = await fsPromises.readFile(tomlPath, 'utf8');
-                tomlConfig = TOML.parse(tomlContent);
+                tomlContent = await fsPromises.readFile(tomlPath, 'utf8');
             } else {
                 console.warn(`[Link Server] velocity.toml not found for proxy ${proxyServer.name}. Cannot link server.`);
                 return;
             }
-    
-            if (!tomlConfig.servers) tomlConfig.servers = {};
-            if (!tomlConfig['forced-hosts']) tomlConfig['forced-hosts'] = {};
 
             const serverEntryName = serverToAdd.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-            tomlConfig.servers[serverEntryName] = `${serverToAdd.ip}:${serverToAdd.port}`;
-            
-            const forcedHostKey = `${serverEntryName}.example.com`;
-            tomlConfig['forced-hosts'][forcedHostKey] = [serverEntryName];
+            const serverAddress = `${serverToAdd.ip}:${serverToAdd.port}`;
 
-            if (!tomlConfig.servers.try) {
-                tomlConfig.servers.try = [];
+            // Use regex to be more robust against formatting variations
+            const serversSectionRegex = /(\[servers\]\s*[\s\S]*?)(?=\n\[|$)/;
+            const tryLineRegex = /try\s*=\s*(\[.*\])/;
+
+            let newTomlContent = tomlContent;
+
+            if (serversSectionRegex.test(newTomlContent)) {
+                 newTomlContent = newTomlContent.replace(serversSectionRegex, (match, serversSection) => {
+                    let newSection = serversSection;
+                    // Add the server if it doesn't exist
+                    if (!newSection.includes(`${serverEntryName} =`)) {
+                        newSection = newSection.trimEnd() + `\n${serverEntryName} = "${serverAddress}"\n`;
+                    }
+                    // Handle the 'try' array
+                    if (tryLineRegex.test(newSection)) {
+                        newSection = newSection.replace(tryLineRegex, (tryMatch, tryArrayString) => {
+                            try {
+                                const tryArray = JSON.parse(tryArrayString.replace(/'/g, '"'));
+                                if (!tryArray.includes(serverEntryName)) {
+                                    tryArray.push(serverEntryName);
+                                    return `try = ${JSON.stringify(tryArray).replace(/"/g, "'")}`;
+                                }
+                                return tryMatch;
+                            } catch (e) { return tryMatch; } // Fallback on parse error
+                        });
+                    } else {
+                        newSection += `try = ['${serverEntryName}']\n`;
+                    }
+                    return newSection;
+                });
+            } else {
+                newTomlContent += `\n[servers]\ntry = ["${serverEntryName}"]\n${serverEntryName} = "${serverAddress}"\n`;
             }
-            if (tomlConfig.servers.try.length === 0) {
-                tomlConfig.servers.try.push(serverEntryName);
+
+            const forcedHostsSectionRegex = /(\[forced-hosts\]\s*[\s\S]*?)(?=\n\[|$)/;
+            const forcedHostEntry = `"${serverEntryName}.example.com" = ["${serverEntryName}"]`;
+
+            if(forcedHostsSectionRegex.test(newTomlContent)) {
+                 newTomlContent = newTomlContent.replace(forcedHostsSectionRegex, (match) => {
+                    if (!match.includes(forcedHostEntry)) {
+                        return match.trimEnd() + `\n${forcedHostEntry}\n`;
+                    }
+                    return match;
+                });
+            } else {
+                newTomlContent += `\n[forced-hosts]\n${forcedHostEntry}\n`;
             }
-    
-            await fsPromises.writeFile(tomlPath, TOML.stringify(tomlConfig), 'utf8');
+
+            await fsPromises.writeFile(tomlPath, newTomlContent, 'utf8');
             console.log(`[Link Server] Successfully added new server '${serverToAdd.name}' to proxy '${proxyServer.name}' config.`);
         } catch (tomlError) {
             console.error(`[Link Server] Failed to update proxy config for new server:`, tomlError);
@@ -274,8 +308,8 @@ class ServerController {
                 status: 'Offline',
                 connectedPlayers: [],
                 maxPlayers: 20,
-                minRam: '1024M',
-                maxRam: '2048M',
+                minRam: this.indexController.config.default_min_ram || '1024M',
+                maxRam: this.indexController.config.default_max_ram || '2048M',
                 description: `A new ${serverType} server.`,
                 tags: [],
             };
@@ -343,9 +377,9 @@ class ServerController {
     
             if (serverType === 'Velocity') {
                  const proxyDetails = {
-                    name: name,
-                    port: port,
-                    serverType: serverType,
+                    name,
+                    port: parseInt(port, 10),
+                    serverType: 'Velocity',
                     serverVersion: velocityVersion,
                 };
                 const proxyServer = await this._internalCreateServer(proxyDetails);
@@ -353,7 +387,7 @@ class ServerController {
 
                 if (createHubServer && hubVersion) {
                     const allServers = this.indexController._readServers();
-                    const hubExists = allServers.some(s => s.name === 'Hub' || s.port === 25566);
+                    const hubExists = allServers.some(s => s.name.toLowerCase() === 'hub' || s.port === 25566);
         
                     if (!hubExists) {
                         const hubDetails = {
@@ -382,10 +416,10 @@ class ServerController {
     
             } else { // PaperMC
                  const paperDetails = {
-                    name: name,
-                    port: port,
-                    serverType: serverType,
-                    serverVersion: serverVersion,
+                    name,
+                    port: parseInt(port, 10),
+                    serverType: 'PaperMC',
+                    serverVersion,
                 };
                 const paperServer = await this._internalCreateServer(paperDetails);
     
@@ -840,7 +874,7 @@ class ServerController {
                 }
 
                 console.log(`[Start Server] Spawning process for ${server.name} with args: ${javaArgs.join(' ')}`);
-                serverProcess = spawn('java', javaArgs, {
+                serverProcess = spawn(this.indexController.config.java_executable_path || 'java', javaArgs, {
                     cwd: serverFolderPath,
                     stdio: ['pipe', 'pipe', 'pipe']
                 });
@@ -1304,4 +1338,3 @@ class ServerController {
 }
 
 module.exports = ServerController;
-

@@ -20,7 +20,8 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 
-const apiRouter = require('./routes/index.js'); 
+const createApiRouter = require('./routes/index.js'); 
+const apiRouter = createApiRouter(config);
 
 const app = express();
 // Use a specific environment variable for the backend port, or config.json, defaulting to 3005

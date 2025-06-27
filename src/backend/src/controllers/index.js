@@ -167,8 +167,9 @@ const httpsGetJson = (url) => {
 
 
 class IndexController {
-    constructor() {
+    constructor(config) {
         console.log("IndexController instantiated in backend/controllers");
+        this.config = config || {}; // Store the config
         this.activeServerProcesses = {};
         this.activeLogFileStreams = {};
         this.stdoutBuffers = {};
@@ -279,8 +280,9 @@ class IndexController {
 
     startStatsMonitoring() {
         if (this.statsUpdateInterval) clearInterval(this.statsUpdateInterval);
-        this.statsUpdateInterval = setInterval(() => this._updateAllServerStats(), 2500);
-        console.log("Started server stats monitoring loop.");
+        const interval = this.config.stats_poll_interval_ms || 2500;
+        this.statsUpdateInterval = setInterval(() => this._updateAllServerStats(), interval);
+        console.log(`Started server stats monitoring loop with interval: ${interval}ms.`);
     }
 
     stopStatsMonitoring() {

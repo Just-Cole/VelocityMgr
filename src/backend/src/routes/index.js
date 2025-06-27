@@ -28,11 +28,11 @@ const upload = multer({
 });
 
 // Function to create and configure the router
-const createApiRouter = () => {
+const createApiRouter = (config) => { // Accept config object
     const router = express.Router();
     
     // Create a single instance of the main controller to share state
-    const indexController = new IndexController();
+    const indexController = new IndexController(config); // Pass config to controller
 
     // Instantiate all other controllers, passing the main controller instance
     const authController = new AuthController(indexController);
@@ -128,4 +128,4 @@ const createApiRouter = () => {
     return router;
 };
 
-module.exports = createApiRouter();
+module.exports = createApiRouter;

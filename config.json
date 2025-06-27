@@ -1,4 +1,9 @@
 {
   "backend_port": 3005,
-  "frontend_port": 9002
+  "frontend_port": 9002,
+  "java_executable_path": "java",
+  "default_min_ram": "1024M",
+  "default_max_ram": "2048M",
+  "stats_poll_interval_ms": 2500,
+  "log_level": "info"
 }
