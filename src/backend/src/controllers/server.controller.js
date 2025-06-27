@@ -124,11 +124,20 @@ sample-players-in-ping = false
 enable-player-address-logging = true
 
 [servers]
-try = [ "hub" ]
+# Configure your servers here. Each key represents the server's name, and the value
+# represents the IP address of the server to connect to.
 hub = "127.0.0.1:25566"
 
+# In what order we should try servers when a player logs in or is kicked from a server.
+try = [
+    "hub"
+]
+
 [forced-hosts]
-"hub.example.com" = [ "hub" ]
+# Configure your forced hosts here.
+"hub.example.com" = [
+    "hub"
+]
 
 [advanced]
 # How large a Minecraft packet has to be before we compress it. Setting this to zero will
@@ -216,51 +225,83 @@ class ServerController {
         }
     }
 
-    async createServer(req, res, next) {
+    async _addServerToProxyConfig(serverToAdd, proxyServer) {
+        try {
+            const tomlPath = path.join(this.indexController._getServerFolderPath(proxyServer), 'velocity.toml');
+            let tomlContent = '';
+            if (fs.existsSync(tomlPath)) {
+                tomlContent = await fsPromises.readFile(tomlPath, 'utf8');
+            } else {
+                return; // No config to add to
+            }
+    
+            let tomlLines = tomlContent.split(/\r?\n/);
+            const serverEntryName = serverToAdd.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const newServerLine = `${serverEntryName} = "${serverToAdd.ip}:${serverToAdd.port}"`;
+            const newForcedHostLine = `"${serverEntryName}.example.com" = ["${serverEntryName}"]`;
+    
+            const insertIntoSection = (lines, sectionName, lineToInsert) => {
+                const sectionIndex = lines.findIndex(line => line.trim() === `[${sectionName}]`);
+                if (sectionIndex !== -1) {
+                    let endOfSectionIndex = lines.findIndex((line, index) => index > sectionIndex && line.trim().startsWith('['));
+                    if (endOfSectionIndex === -1) endOfSectionIndex = lines.length;
+                    
+                    const existingEntryRegex = new RegExp(`^\\s*${serverEntryName}\\s*=`);
+                    const hasEntry = lines.slice(sectionIndex, endOfSectionIndex).some(line => existingEntryRegex.test(line));
+    
+                    if (!hasEntry) {
+                        lines.splice(endOfSectionIndex, 0, lineToInsert);
+                    }
+                } else {
+                    lines.push('', `[${sectionName}]`, lineToInsert);
+                }
+            };
+            
+            insertIntoSection(tomlLines, 'servers', newServerLine);
+            insertIntoSection(tomlLines, 'forced-hosts', newForcedHostLine);
+    
+            await fsPromises.writeFile(tomlPath, tomlLines.join('\n'), 'utf8');
+            console.log(`[Link Server] Successfully added new server '${serverToAdd.name}' to proxy '${proxyServer.name}' config.`);
+        } catch (tomlError) {
+            console.error(`[Link Server] Failed to update proxy config for new server:`, tomlError);
+        }
+    }
+    
+    async _internalCreateServer(serverDetails) {
         const {
             serverName,
             port,
             serverType,
-        } = req.body;
-        let { serverVersion } = req.body;
-
-        if (!serverName || !port || !serverType || !serverVersion) {
-            return res.status(400).json({
-                message: "Missing required fields for server creation."
-            });
-        }
-
+        } = serverDetails;
+        let { serverVersion } = serverDetails;
+    
         try {
             let servers = this.indexController._readServers();
             if (servers.find(s => s.name.toLowerCase() === serverName.toLowerCase())) {
-                return res.status(409).json({
-                    message: `A server with the name "${serverName}" already exists.`
-                });
+                throw new Error(`A server with the name "${serverName}" already exists.`);
             }
             if (servers.find(s => s.port === parseInt(port, 10))) {
-                return res.status(409).json({
-                    message: `A server is already using port ${port}.`
-                });
+                throw new Error(`A server is already using port ${port}.`);
             }
-
+    
             const isPaper = serverType === 'PaperMC';
             const apiProjectName = isPaper ? 'paper' : 'velocity';
-            
-            console.log(`[Create Server] Build not specified for ${serverType} ${serverVersion}. Fetching latest build...`);
+    
+            if (!serverVersion) {
+                const versionData = await this.indexController.httpsGetJson(`https://api.papermc.io/v2/projects/${apiProjectName}`);
+                serverVersion = versionData.versions.pop();
+            }
+    
             const buildsResponse = await this.indexController.httpsGetJson(`https://api.papermc.io/v2/projects/${apiProjectName}/versions/${serverVersion}/builds`);
-            const latestBuildDetails = buildsResponse.builds.pop(); // Last in array is latest
+            const latestBuildDetails = buildsResponse.builds.pop();
             if (!latestBuildDetails) {
-                return res.status(404).json({ message: `Could not find any builds for ${serverType} version ${serverVersion}. Please check the version number.` });
+                throw new Error(`Could not find any builds for ${serverType} version ${serverVersion}.`);
             }
             const buildNumber = latestBuildDetails.build;
-            // Use the full version string from the API response for accuracy
-            serverVersion = buildsResponse.version; 
-            console.log(`[Create Server] Found latest build for ${serverVersion}: ${buildNumber}`);
-            
-
-            const newServerId = uuidv4();
+            serverVersion = buildsResponse.version;
+    
             const newServer = {
-                id: newServerId,
+                id: uuidv4(),
                 name: serverName,
                 port: parseInt(port, 10),
                 ip: '127.0.0.1',
@@ -276,150 +317,123 @@ class ServerController {
                 description: `A new ${serverType} server.`,
                 tags: [],
             };
-
+    
             const serverFolderPath = this.indexController._getServerFolderPath(newServer);
-            await fsPromises.mkdir(serverFolderPath, {
-                recursive: true
-            });
-
+            await fsPromises.mkdir(serverFolderPath, { recursive: true });
+    
             const downloadFileName = `${apiProjectName}-${serverVersion}-${buildNumber}.jar`;
             const serverJarPath = path.join(serverFolderPath, downloadFileName);
-
             if (!fs.existsSync(serverJarPath)) {
                 const downloadUrl = `https://api.papermc.io/v2/projects/${apiProjectName}/versions/${serverVersion}/builds/${buildNumber}/downloads/${downloadFileName}`;
-                console.log(`[Create Server] JAR not found. Downloading from ${downloadUrl}`);
                 await this.indexController.downloadFile(downloadUrl, serverFolderPath, downloadFileName);
             }
-
             newServer.jarFileName = downloadFileName;
-
-            const eulaPath = path.join(serverFolderPath, 'eula.txt');
-            if (!fs.existsSync(eulaPath)) {
-                await fsPromises.writeFile(eulaPath, 'eula=true', 'utf-8');
-            }
-
-            if (newServer.softwareType === 'PaperMC') {
+    
+            await fsPromises.writeFile(path.join(serverFolderPath, 'eula.txt'), 'eula=true', 'utf-8');
+    
+            if (isPaper) {
                 await this.indexController._updateServerPropertiesPort(newServer, newServer.port);
-            } else if (newServer.softwareType === 'Velocity') {
+            } else {
                 const tomlPath = path.join(serverFolderPath, 'velocity.toml');
                 if (!fs.existsSync(tomlPath)) {
-                    console.log(`[Create Server] Creating default velocity.toml for new proxy ${newServer.name} using full template.`);
-                    
                     const finalTomlContent = velocityTomlTemplate
                         .replace(/bind\s*=\s*"0\.0\.0\.0:25565"/, `bind = "0.0.0.0:${newServer.port}"`);
-
                     await fsPromises.writeFile(tomlPath, finalTomlContent.trim(), 'utf-8');
-                    
+    
                     const secretFilePath = path.join(serverFolderPath, 'forwarding.secret');
                     if (!fs.existsSync(secretFilePath)) {
                         const secret = crypto.randomBytes(12).toString('hex');
                         await fsPromises.writeFile(secretFilePath, secret, 'utf-8');
-                        console.log(`[Create Server] Generated new forwarding.secret for proxy ${newServer.name}.`);
                     }
                 }
             }
-            
-            // --- Copy companion plugin ---
+    
             let pluginJarName, pluginSrcPath;
-            if (newServer.softwareType === 'PaperMC') {
+            if (isPaper) {
                 pluginJarName = 'spigot-vmanager-plugin-1.0.0.jar';
                 pluginSrcPath = path.join(__dirname, '..', '..', '..', 'spigot-plugin', 'target', pluginJarName);
-            } else if (newServer.softwareType === 'Velocity') {
+            } else {
                 pluginJarName = 'velocity-manager-plugin-1.0.0.jar';
                 pluginSrcPath = path.join(__dirname, '..', '..', '..', 'velocity-plugin', 'target', pluginJarName);
             }
-
-            if (pluginJarName && pluginSrcPath) {
-                if (fs.existsSync(pluginSrcPath)) {
-                    const pluginsDestDir = path.join(serverFolderPath, 'plugins');
-                    await fsPromises.mkdir(pluginsDestDir, { recursive: true });
-                    const pluginDestPath = path.join(pluginsDestDir, pluginJarName);
-                    await fsPromises.copyFile(pluginSrcPath, pluginDestPath);
-                    console.log(`[Create Server] Copied ${pluginJarName} to new server's plugins folder.`);
-                } else {
-                    console.warn(`[Create Server] Companion plugin JAR not found at ${pluginSrcPath}. It was not copied. Please build the plugins first.`);
-                }
+    
+            if (pluginJarName && pluginSrcPath && fs.existsSync(pluginSrcPath)) {
+                const pluginsDestDir = path.join(serverFolderPath, 'plugins');
+                await fsPromises.mkdir(pluginsDestDir, { recursive: true });
+                await fsPromises.copyFile(pluginSrcPath, path.join(pluginsDestDir, pluginJarName));
             }
-            // --- End plugin copy ---
-
-
-            servers.push(newServer);
-            this.indexController._writeServers(servers);
-
-            if (newServer.softwareType === 'PaperMC') {
-                const allServers = this.indexController._readServers();
-                const proxyServer = allServers.find(s => s.softwareType === 'Velocity');
-
-                if (proxyServer) {
-                    try {
-                        const tomlPath = path.join(this.indexController._getServerFolderPath(proxyServer), 'velocity.toml');
-                        let tomlContent = '';
-                        if (fs.existsSync(tomlPath)) {
-                            tomlContent = await fsPromises.readFile(tomlPath, 'utf8');
-                        } else {
-                            // This shouldn't happen if a proxy exists, but as a fallback
-                            tomlContent = velocityTomlTemplate;
-                        }
-
-                        let tomlLines = tomlContent.split(/\r?\n/);
-                        const serverEntryName = newServer.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-                        const newServerLine = `${serverEntryName} = "${newServer.ip}:${newServer.port}"`;
-                        const newForcedHostLine = `"${serverEntryName}.example.com" = ["${serverEntryName}"]`;
-
-                        const insertIntoSection = (lines, sectionName, lineToInsert) => {
-                            const sectionIndex = lines.findIndex(line => line.trim() === `[${sectionName}]`);
-                            if (sectionIndex !== -1) {
-                                let endOfSectionIndex = lines.findIndex((line, index) => index > sectionIndex && line.trim().startsWith('['));
-                                if (endOfSectionIndex === -1) endOfSectionIndex = lines.length;
-                                lines.splice(endOfSectionIndex, 0, lineToInsert);
-                            } else {
-                                lines.push('', `[${sectionName}]`, lineToInsert);
-                            }
-                        };
-                        
-                        insertIntoSection(tomlLines, 'servers', newServerLine);
-                        insertIntoSection(tomlLines, 'forced-hosts', newForcedHostLine);
-
-                        const tryIndex = tomlLines.findIndex(line => line.trim().startsWith('try ='));
-                        if (tryIndex !== -1 && tomlLines[tryIndex].includes('[]')) {
-                            tomlLines[tryIndex] = tomlLines[tryIndex].replace('[]', `["${serverEntryName}"]`);
-                        }
-
-                        await fsPromises.writeFile(tomlPath, tomlLines.join('\n'), 'utf8');
-                        console.log(`[Create Server] Successfully added new server '${newServer.name}' to proxy '${proxyServer.name}' config.`);
-                        
-                        await this.indexController._syncVelocitySecret(newServer, proxyServer);
-
-                        return res.status(201).json({
-                            message: `Server "${newServer.name}" created, linked to proxy, and forwarding secret synced. Restart the proxy to apply.`,
-                            server: newServer,
-                        });
-
-                    } catch (tomlError) {
-                        console.error(`[Create Server] Failed to update proxy config for new server:`, tomlError);
-                        return res.status(201).json({
-                            message: `Server "${newServer.name}" created, but FAILED to link to proxy. You must add it to velocity.toml manually. Error: ${tomlError.message}`,
-                            server: newServer,
-                        });
-                    }
-                } else {
-                    console.log(`[Create Server] New PaperMC server created, but no Velocity proxy was found to link it to.`);
-                }
-            }
-
-            res.status(201).json({
-                message: `Server "${newServer.name}" created successfully. You can now manage it from the dashboard.`,
-                server: newServer,
-            });
-
+    
+            let allServers = this.indexController._readServers();
+            allServers.push(newServer);
+            this.indexController._writeServers(allServers);
+    
+            return newServer;
+    
         } catch (error) {
-             if (error.statusCode === 404) {
-                return res.status(404).json({ message: `Version '${serverVersion}' not found on PaperMC API. Please check the version number.` });
-             }
-             next(error);
+            console.error(`[Internal Create] Failed to create server ${serverName}:`, error);
+            // Re-throw to be caught by the main createServer function
+            throw error;
         }
     }
     
+    async createServer(req, res, next) {
+        try {
+            const { serverType, serverName } = req.body;
+    
+            if (serverType === 'Velocity') {
+                const proxyServer = await this._internalCreateServer(req.body);
+    
+                const allServers = this.indexController._readServers();
+                const hubExists = allServers.some(s => s.name === 'Hub' || s.port === 25566);
+                let hubCreationMessage = '';
+    
+                if (!hubExists) {
+                    const hubDetails = {
+                        serverName: 'Hub',
+                        port: 25566,
+                        serverType: 'PaperMC',
+                        serverVersion: null, // Let internal creator find latest
+                    };
+                    try {
+                        const hubServer = await this._internalCreateServer(hubDetails);
+                        await this.indexController._syncVelocitySecret(hubServer, proxyServer);
+                        hubCreationMessage = 'Companion Hub server was also created and linked.';
+                    } catch (hubError) {
+                        hubCreationMessage = `Warning: Failed to create companion Hub server. Error: ${hubError.message}`;
+                    }
+                } else {
+                    hubCreationMessage = 'A server named "Hub" or using port 25566 already exists. Skipping Hub creation.';
+                }
+                
+                res.status(201).json({
+                    message: `Velocity proxy "${proxyServer.name}" created. ${hubCreationMessage}`,
+                    server: proxyServer,
+                });
+    
+            } else { // PaperMC
+                const paperServer = await this._internalCreateServer(req.body);
+    
+                const allServers = this.indexController._readServers();
+                const proxyServer = allServers.find(s => s.softwareType === 'Velocity');
+                if (proxyServer) {
+                    await this._addServerToProxyConfig(paperServer, proxyServer);
+                    await this.indexController._syncVelocitySecret(paperServer, proxyServer);
+                    res.status(201).json({
+                        message: `Server "${paperServer.name}" created and linked to proxy. Restart the proxy to apply.`,
+                        server: paperServer,
+                    });
+                } else {
+                    res.status(201).json({
+                        message: `Server "${paperServer.name}" created successfully.`,
+                        server: paperServer,
+                    });
+                }
+            }
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async createFromModpack(req, res, next) {
         const {
             serverName,
@@ -1314,3 +1328,4 @@ class ServerController {
 }
 
 module.exports = ServerController;
+
