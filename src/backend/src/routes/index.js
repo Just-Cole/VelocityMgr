@@ -1,3 +1,4 @@
+
 // src/backend/src/routes/index.js
 
 const express = require('express');
@@ -64,6 +65,7 @@ const createApiRouter = () => {
     router.get('/minecraft/servers', serverController.listServers.bind(serverController));
     router.post('/minecraft/servers', serverController.createServer.bind(serverController));
     router.post('/minecraft/servers/create-from-modpack', serverController.createFromModpack.bind(serverController));
+    router.post('/minecraft/servers/upload-zip', upload.single('serverZip'), serverController.createFromZip.bind(serverController));
     router.patch('/minecraft/servers/:serverId/settings', serverController.updateServerSettings.bind(serverController));
     router.post('/minecraft/servers/:serverId/delete-recoverable', serverController.deleteServerWithRecovery.bind(serverController));
     router.get('/minecraft/servers/:serverId/banned-players', serverController.getBannedPlayers.bind(serverController));

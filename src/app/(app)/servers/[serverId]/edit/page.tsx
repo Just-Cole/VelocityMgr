@@ -374,10 +374,6 @@ export default function EditServerPage() {
       }
   }, [server, serverId]);
 
-  React.useEffect(() => {
-      fetchConfig();
-  }, [fetchConfig]);
-
   const handlePropertyChange = (key: string, value: string) => {
       setServerProperties(prev => prev ? { ...prev, [key]: value } : { [key]: value });
   };
@@ -502,11 +498,6 @@ export default function EditServerPage() {
       setIsLoadingFiles(false);
     }
   }, [serverId, toast]);
-
-  React.useEffect(() => {
-    fetchFiles(currentFilePath);
-  }, [currentFilePath, fetchFiles]);
-
 
   const handleSaveChanges = async () => {
     if (!server || !canEdit) return;
@@ -1042,12 +1033,12 @@ export default function EditServerPage() {
       </PageHeader>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 md:grid-cols-3 mb-4 overflow-x-auto">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 mb-4 overflow-x-auto">
           <TabsTrigger value="general">General</TabsTrigger>
-          {/* <TabsTrigger value="main-config">Config File</TabsTrigger> */}
-          <TabsTrigger value="file-manager">File Manager</TabsTrigger>
-          <TabsTrigger value="backups" onClick={fetchBackups}>Backups Manager</TabsTrigger>
-          {/* <TabsTrigger value="plugins" onClick={fetchPlugins}>Plugins</TabsTrigger> */}
+          <TabsTrigger value="main-config" onClick={fetchConfig}>Config Editor</TabsTrigger>
+          <TabsTrigger value="file-manager" onClick={() => fetchFiles(currentFilePath)}>File Manager</TabsTrigger>
+          <TabsTrigger value="backups" onClick={fetchBackups}>Backups</TabsTrigger>
+          <TabsTrigger value="plugins" onClick={fetchPlugins}>Plugins</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general">
@@ -1168,7 +1159,6 @@ export default function EditServerPage() {
           </Card>
         </TabsContent>
 
-        {/*
         <TabsContent value="main-config">
             {server?.softwareType === 'Velocity' ? (
                 <Card>
@@ -1347,7 +1337,6 @@ export default function EditServerPage() {
                 </Card>
             )}
         </TabsContent>
-        */}
 
         <TabsContent value="file-manager">
           <Card>
@@ -1517,7 +1506,6 @@ export default function EditServerPage() {
           </Card>
         </TabsContent>
 
-        {/*
         <TabsContent value="plugins">
           <Card>
               <CardHeader className="flex flex-row items-center justify-between">
@@ -1603,7 +1591,6 @@ export default function EditServerPage() {
               </CardFooter>
             </Card>
         </TabsContent>
-        */}
       </Tabs>
 
       {/* File Editor Dialog */}
@@ -1793,11 +1780,3 @@ export default function EditServerPage() {
   );
 }
     
-
-    
-
-
-
-
-
-
