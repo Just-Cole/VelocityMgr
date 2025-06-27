@@ -1,49 +1,49 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
 
 # Velocity Manager
 
-Velocity Manager is a web application designed to simplify the management of game servers, particularly Minecraft servers using PaperMC and Velocity proxies. It provides a user-friendly interface for creating, configuring, monitoring, and controlling your server instances.
+Velocity Manager is a comprehensive, web-based application designed to simplify the management of game servers. It provides a modern, user-friendly interface for creating, configuring, monitoring, and controlling your server instances, whether they are single PaperMC servers, complex Velocity proxy networks, or modded servers from Modrinth.
 
 ## ✨ Features
 
-*   **Server Dashboard:** Overview of all your game servers, their status, and key metrics.
-*   **Server Creation:**
-    *   Simplified setup for single PaperMC or Velocity instances.
-    *   Automated creation of full proxy networks (Velocity proxy + backend PaperMC servers like Hub & Survival) with pre-configured templates.
-    *   Dynamic fetching of latest PaperMC/Velocity versions and builds.
+*   **Network Dashboard:** Get a high-level overview of all your game servers, their online status, current player counts, and aggregate resource usage (CPU & RAM).
+*   **Server Creation & Setup:**
+    *   **Single Server:** Easily create a standalone PaperMC or Velocity instance.
+    *   **Proxy Network:** Automatically set up a Velocity proxy complete with a backend "Hub" server, with secure forwarding configured out-of-the-box.
+    *   **Modpack Installation:** Search for and install server packs directly from Modrinth. Includes an AI assistant to suggest optimal RAM allocation based on the modpack's description.
+    *   **Upload Existing Server:** Migrate an existing server by simply uploading its contents in a `.zip` file.
 *   **Server Management:**
-    *   **Live Console:** View real-time server console output and send commands.
-    *   **Player List:** See currently connected players with options for moderation (kick, ban, message - via console commands).
-    *   **Banned Players:** View and manage the list of banned players for a server.
-    *   **Resource Monitoring:** (Placeholder) View CPU and RAM usage.
+    *   **Live Console:** View real-time server console output and send commands directly from the web UI.
+    *   **Player List:** See currently connected players, with options for moderation (kick, ban, message).
+    *   **Resource Monitoring:** View live CPU and RAM usage for each server.
+    *   **AI Log Analysis:** Use the AI assistant to diagnose server logs for critical errors and get easy-to-understand explanations and suggested fixes.
     *   **Server Actions:** Start, Stop, and Restart servers directly from the dashboard or management page.
-*   **Server Editing & Configuration:**
-    *   **File Manager:** Browse, view, edit (for text-based files like `.yml`, `.properties`, `.toml`, `.secret`), upload, create folders, rename, and delete files/folders within a server's directory.
-    *   **Settings:** Modify server name, port, description, RAM allocation, custom launch arguments, and max players.
-    *   **Plugin Management:** (Basic) List installed plugins, toggle enabled/disabled state (by renaming `.jar` to `.jar.disabled`), install plugins from Hangar, and uninstall plugins.
-*   **Application Settings:** (Placeholder) Customize application appearance, notifications, and other global preferences.
-*   **AI Advisor:** Get AI-powered suggestions for optimized server configurations based on your requirements.
-*   **Modern UI:** Built with ShadCN UI components and Tailwind CSS for a clean and responsive experience.
+*   **Server Configuration:**
+    *   **General Settings:** Easily modify server name, port, description, RAM allocation, custom Java launch arguments, and tags.
+    *   **Structured Config Editor:** A user-friendly, form-based editor for `server.properties` (PaperMC) and `velocity.toml` (Velocity) files, preventing syntax errors.
+    *   **File Manager:** A full-featured file browser to view, edit, upload, create folders, rename, and delete files/folders within a server's directory.
+    *   **Backup Management:** Create on-demand backups, restore a server to a previous state, download, or delete old backups.
+    *   **Plugin Management:**
+        *   List installed plugins and toggle their enabled/disabled state.
+        *   Browse and install new plugins directly from SpigotMC's resources.
+        *   Uninstall plugins with a single click.
+*   **Administration & Security:**
+    *   **User & Role Management:** A robust role-based access control (RBAC) system. Create custom roles, assign fine-grained permissions (e.g., `view_logs`, `start_stop_servers`), and assign roles to users.
+    *   **Server Recovery:** Deleted servers are moved to a recovery area, allowing you to restore them or delete them permanently.
+    *   **Profile Management:** Users can manage their own account and change their password.
 
 ## 🚀 Tech Stack
 
 *   **Frontend:**
     *   Next.js (App Router)
-    *   React
-    *   TypeScript
-    *   Tailwind CSS
-    *   ShadCN UI Components
+    *   React & TypeScript
+    *   Tailwind CSS & ShadCN UI Components
     *   Lucide React Icons
 *   **Backend:**
-    *   Node.js
-    *   Express.js
+    *   Node.js & Express.js for the API.
+    *   Handles server process management, file system operations, and API logic.
 *   **AI Functionality:**
-    *   Genkit
-    *   Google AI (Gemini)
-*   **Development Tools:**
-    *   Turbopack
-    *   ESLint, Prettier (implied by typical Next.js setup)
+    *   Google Genkit
+    *   Google AI (Gemini Models) for diagnostics and recommendations.
 
 ## 🏁 Getting Started
 
@@ -53,6 +53,7 @@ Follow these instructions to get a copy of the project up and running on your lo
 
 *   Node.js (v18 or later recommended)
 *   npm (usually comes with Node.js) or yarn
+*   Java (JDK 17 or later) for running Minecraft servers.
 
 ### Installation
 
@@ -62,53 +63,27 @@ Follow these instructions to get a copy of the project up and running on your lo
     cd <repository-folder>
     ```
 
-2.  **Install frontend dependencies:**
+2.  **Install project dependencies:**
+    This single command will install dependencies for both the frontend (Next.js) and the backend.
     ```bash
     npm install
-    ```
-    (This will also install `rimraf` which is used in the `dev` script).
-
-3.  **Install backend dependencies:**
-    Navigate to the backend directory and install its dependencies:
-    ```bash
-    cd src/backend
-    npm install
-    cd ../..
     ```
 
 ### Running the Application
 
-You need to run both the frontend and backend servers.
+You need to run both the frontend and backend servers concurrently. The project is set up to do this with a single command.
 
-**Option 1: Using Batch Files (for Windows)**
+Open a terminal in the project root directory and run:
 
-*   **`start-dev.bat`**: Runs frontend and backend in separate command prompt windows.
-    ```bash
-    start-dev.bat
-    ```
-*   **`start-dev-single-window.bat`**: Runs frontend and backend in a single command prompt window.
-    ```bash
-    start-dev-single-window.bat
-    ```
-    (Note: `Ctrl+C` in the single window might only stop the frontend. You may need to close the backend process manually via Task Manager.)
+```bash
+npm run dev
+```
 
-**Option 2: Manual Startup (Cross-platform)**
+This will:
+*   Start the **Backend API Server** (typically on `http://localhost:3005`).
+*   Start the **Frontend Development Server** (typically on `http://localhost:9002`).
 
-1.  **Start the Backend Server:**
-    Open a terminal, navigate to the `src/backend` directory, and run:
-    ```bash
-    npm start
-    ```
-    The backend server will typically run on `http://localhost:4001`.
-
-2.  **Start the Frontend Development Server:**
-    Open another terminal in the project root directory and run:
-    ```bash
-    npm run dev
-    ```
-    The frontend development server will run on `http://localhost:4000`.
-
-Once both servers are running, open your browser and navigate to `http://localhost:4000`.
+Once both servers are running, open your browser and navigate to the frontend URL displayed in the terminal.
 
 ## 📂 Project Structure (Simplified)
 
@@ -117,207 +92,25 @@ Once both servers are running, open your browser and navigate to `http://localho
 ├── public/                  # Static assets (images, favicons)
 ├── src/
 │   ├── app/                 # Next.js App Router (frontend pages, layouts)
-│   │   ├── (app)/           # Authenticated/main application routes
-│   │   └── ...
-│   ├── actions/             # Server Actions for form submissions / mutations
+│   │   ├── (app)/           # Main application routes (dashboard, etc.)
+│   │   └── (auth)/          # Authentication routes (login)
+│   ├── actions/             # Next.js Server Actions for calling AI flows
 │   ├── ai/                  # Genkit AI flows and configuration
 │   ├── backend/             # Node.js/Express backend server
 │   │   ├── src/
-│   │   │   ├── controllers/ # Backend logic for API routes
+│   │   │   ├── controllers/ # Backend logic for API routes (separated by concern)
 │   │   │   ├── routes/      # API route definitions
 │   │   │   └── index.js     # Backend server entry point
 │   │   └── app_data/        # Data storage for servers, configs (created on run)
 │   ├── components/          # React components (UI and custom)
 │   │   └── ui/              # ShadCN UI components
+│   ├── contexts/            # React Context providers (e.g., AuthContext)
 │   ├── hooks/               # Custom React hooks
 │   ├── lib/                 # Shared utilities, constants, types
-│   └── ...
+│   ├── spigot-plugin/       # Source for the Spigot companion plugin
+│   └── velocity-plugin/     # Source for the Velocity companion plugin
 ├── .env                     # Environment variables (create if needed)
 ├── next.config.ts           # Next.js configuration
 ├── package.json             # Project dependencies and scripts
-├── tailwind.config.ts       # Tailwind CSS configuration
-├── tsconfig.json            # TypeScript configuration
 └── README.md                # This file
 ```
-
-## 🤝 Contributing
-
-Contributions are welcome! If you'd like to contribute, please follow these steps:
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature/your-feature-name`).
-3. Make your changes.
-4. Commit your changes (`git commit -m 'Add some feature'`).
-5. Push to the branch (`git push origin feature/your-feature-name`).
-6. Open a Pull Request.
-
-Please make sure to update tests as appropriate.
-
-## 📄 License
-
-This project is licensed under the [MIT License](LICENSE.md) (You'll need to create a LICENSE.md file if you choose this license).
-```
-=======
-# Firebase Studio
-=======
->>>>>>> e06a37c (vv)
-
-# Velocity Manager
-
-<<<<<<< HEAD
-To get started, take a look at src/app/page.tsx.
->>>>>>> 73da13e (initial scaffold)
-=======
-Velocity Manager is a web application designed to simplify the management of game servers, particularly Minecraft servers using PaperMC and Velocity proxies. It provides a user-friendly interface for creating, configuring, monitoring, and controlling your server instances.
-
-## ✨ Features
-
-*   **Server Dashboard:** Overview of all your game servers, their status, and key metrics.
-*   **Server Creation:**
-    *   Simplified setup for single PaperMC or Velocity instances.
-    *   Automated creation of full proxy networks (Velocity proxy + backend PaperMC servers like Hub & Survival) with pre-configured templates.
-    *   Dynamic fetching of latest PaperMC/Velocity versions and builds.
-*   **Server Management:**
-    *   **Live Console:** View real-time server console output and send commands.
-    *   **Player List:** See currently connected players with options for moderation (kick, ban, message - via console commands).
-    *   **Banned Players:** View and manage the list of banned players for a server.
-    *   **Resource Monitoring:** (Placeholder) View CPU and RAM usage.
-    *   **Server Actions:** Start, Stop, and Restart servers directly from the dashboard or management page.
-*   **Server Editing & Configuration:**
-    *   **File Manager:** Browse, view, edit (for text-based files like `.yml`, `.properties`, `.toml`, `.secret`), upload, create folders, rename, and delete files/folders within a server's directory.
-    *   **Settings:** Modify server name, port, description, RAM allocation, custom launch arguments, and max players.
-    *   **Plugin Management:** (Basic) List installed plugins, toggle enabled/disabled state (by renaming `.jar` to `.jar.disabled`), install plugins from Hangar, and uninstall plugins.
-*   **Application Settings:** (Placeholder) Customize application appearance, notifications, and other global preferences.
-*   **AI Advisor:** Get AI-powered suggestions for optimized server configurations based on your requirements.
-*   **Modern UI:** Built with ShadCN UI components and Tailwind CSS for a clean and responsive experience.
-
-## 🚀 Tech Stack
-
-*   **Frontend:**
-    *   Next.js (App Router)
-    *   React
-    *   TypeScript
-    *   Tailwind CSS
-    *   ShadCN UI Components
-    *   Lucide React Icons
-*   **Backend:**
-    *   Node.js
-    *   Express.js
-*   **AI Functionality:**
-    *   Genkit
-    *   Google AI (Gemini)
-*   **Development Tools:**
-    *   Turbopack
-    *   ESLint, Prettier (implied by typical Next.js setup)
-
-## 🏁 Getting Started
-
-Follow these instructions to get a copy of the project up and running on your local machine for development and testing purposes.
-
-### Prerequisites
-
-*   Node.js (v18 or later recommended)
-*   npm (usually comes with Node.js) or yarn
-
-### Installation
-
-1.  **Clone the repository:**
-    ```bash
-    git clone <your-repository-url>
-    cd <repository-folder>
-    ```
-
-2.  **Install frontend dependencies:**
-    ```bash
-    npm install
-    ```
-    (This will also install `rimraf` which is used in the `dev` script).
-
-3.  **Install backend dependencies:**
-    Navigate to the backend directory and install its dependencies:
-    ```bash
-    cd src/backend
-    npm install
-    cd ../..
-    ```
-
-### Running the Application
-
-You need to run both the frontend and backend servers.
-
-**Option 1: Using Batch Files (for Windows)**
-
-*   **`start-dev.bat`**: Runs frontend and backend in separate command prompt windows.
-    ```bash
-    start-dev.bat
-    ```
-*   **`start-dev-single-window.bat`**: Runs frontend and backend in a single command prompt window.
-    ```bash
-    start-dev-single-window.bat
-    ```
-    (Note: `Ctrl+C` in the single window might only stop the frontend. You may need to close the backend process manually via Task Manager.)
-
-**Option 2: Manual Startup (Cross-platform)**
-
-1.  **Start the Backend Server:**
-    Open a terminal, navigate to the `src/backend` directory, and run:
-    ```bash
-    npm start
-    ```
-    The backend server will typically run on `http://localhost:4001`.
-
-2.  **Start the Frontend Development Server:**
-    Open another terminal in the project root directory and run:
-    ```bash
-    npm run dev
-    ```
-    The frontend development server will run on `http://localhost:4000`.
-
-Once both servers are running, open your browser and navigate to `http://localhost:4000`.
-
-## 📂 Project Structure (Simplified)
-
-```
-.
-├── public/                  # Static assets (images, favicons)
-├── src/
-│   ├── app/                 # Next.js App Router (frontend pages, layouts)
-│   │   ├── (app)/           # Authenticated/main application routes
-│   │   └── ...
-│   ├── actions/             # Server Actions for form submissions / mutations
-│   ├── ai/                  # Genkit AI flows and configuration
-│   ├── backend/             # Node.js/Express backend server
-│   │   ├── src/
-│   │   │   ├── controllers/ # Backend logic for API routes
-│   │   │   ├── routes/      # API route definitions
-│   │   │   └── index.js     # Backend server entry point
-│   │   └── app_data/        # Data storage for servers, configs (created on run)
-│   ├── components/          # React components (UI and custom)
-│   │   └── ui/              # ShadCN UI components
-│   ├── hooks/               # Custom React hooks
-│   ├── lib/                 # Shared utilities, constants, types
-│   └── ...
-├── .env                     # Environment variables (create if needed)
-├── next.config.ts           # Next.js configuration
-├── package.json             # Project dependencies and scripts
-├── tailwind.config.ts       # Tailwind CSS configuration
-├── tsconfig.json            # TypeScript configuration
-└── README.md                # This file
-```
-
-## 🤝 Contributing
-
-Contributions are welcome! If you'd like to contribute, please follow these steps:
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature/your-feature-name`).
-3. Make your changes.
-4. Commit your changes (`git commit -m 'Add some feature'`).
-5. Push to the branch (`git push origin feature/your-feature-name`).
-6. Open a Pull Request.
-
-Please make sure to update tests as appropriate.
-
-## 📄 License
-
-This project is licensed under the [MIT License](LICENSE.md) (You'll need to create a LICENSE.md file if you choose this license).
-```
->>>>>>> e06a37c (vv)
