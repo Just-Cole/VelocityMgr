@@ -99,6 +99,7 @@
   "build": {
     "appId": "com.velocitymanager.app",
     "productName": "Velocity Manager",
+    "copyright": "Copyright 2025 Velocity Manager Team",
     "files": [
       "public/**/*",
       ".next/**/*",
