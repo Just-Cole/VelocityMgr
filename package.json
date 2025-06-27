@@ -105,7 +105,6 @@
       ".next/**/*",
       "electron.js",
       "src/backend/src/**/*",
-      "src/backend/package.json",
       "config.json",
       "next.config.ts"
     ],

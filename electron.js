@@ -46,10 +46,12 @@ function startBackend() {
 }
 
 function startFrontendProd() {
-    const nextCliPath = path.join(__dirname, 'node_modules', 'next', 'dist', 'bin', 'next');
-    const env = { ...process.env, BACKEND_PORT: backendPort };
+    const nextCliPath = path.join(__dirname, 'node_modules', '.bin', 'next');
+    // Pass the backend port to the Next.js process as an environment variable
+    const env = { ...process.env, BACKEND_PORT: backendPort }; 
+    
     frontendProcess = fork(nextCliPath, ['start', '-p', frontendPort], {
-        cwd: __dirname, // The Next.js project root in the packaged app
+        cwd: __dirname,
         silent: true,
         env: env,
     });
@@ -85,7 +87,7 @@ async function createWindow() {
       await waitOn({ resources: [startUrl], timeout: 30000 });
     } catch (err) {
       console.error('Error waiting for frontend to start:', err);
-      // Don't return, allow it to try loading the URL so the user sees an error page.
+      // Allow it to try loading the URL so the user sees an error page.
     }
   }
 
@@ -106,7 +108,8 @@ async function createWindow() {
   });
 }
 
-app.on('ready', () => {
+// Make the ready handler async to allow for awaiting createWindow
+app.on('ready', async () => {
   console.log('App is ready. Starting servers and creating window...');
   startBackend();
   
@@ -114,9 +117,8 @@ app.on('ready', () => {
     startFrontendProd();
   }
   
-  // This is async, but we don't need to await it here.
-  // It will create the window and load the URL when ready.
-  createWindow();
+  // Await the window creation, which itself awaits for the server to be ready
+  await createWindow();
 });
 
 app.on('window-all-closed', () => {
@@ -126,7 +128,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
-  // Kill the backend process when the Electron app quits
+  // Kill child processes when the Electron app quits
   if (backendProcess) {
     console.log('Quitting app, terminating backend process...');
     backendProcess.kill();
