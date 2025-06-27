@@ -162,16 +162,15 @@ class ServerController {
                     console.log(`[Create Server] Creating default velocity.toml for new proxy ${newServer.name}`);
                     const defaultConfig = {
                         bind: `0.0.0.0:${newServer.port}`,
-                        motd: `'A Velocity Server'`,
+                        motd: `"A Velocity Server"`,
                         'show-max-players': 500,
                         'online-mode': true,
                         servers: {
-                            // Example server, user will need to configure this
                             lobby: '127.0.0.1:25566' 
                         },
                         try: ['lobby'],
-                        'player-info-forwarding-mode': 'modern', // The requested change
                         forwarding: {
+                            mode: 'modern',
                             'secret-file': 'forwarding.secret'
                         }
                     };
