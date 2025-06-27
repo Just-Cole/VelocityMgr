@@ -689,14 +689,6 @@ class IndexController {
             await fsPromises.mkdir(paperConfigDir, { recursive: true });
     
             const defaultConfig = `
-# This is the global configuration file for Paper.
-# As you can see, there's not much here. This is because Paper ships
-# with a default configuration file, and it is not recommended to copy
-# and edit it. It's better to only override the settings you want to change.
-#
-# You can find the full list of configuration options here:
-# https://docs.papermc.io/paper/configuration
-
 proxies:
   bungee-cord:
     online-mode: true

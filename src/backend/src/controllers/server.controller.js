@@ -1,3 +1,4 @@
+
 const fs = require('fs');
 const fsPromises = require('fs').promises;
 const path = require('path');
@@ -539,7 +540,7 @@ class ServerController {
                 });
             }
 
-            // --- Add companion plugin on start if missing ---
+            // --- Add/Update companion plugin on start ---
             let pluginJarName, pluginSrcPath;
             if (server.softwareType === 'PaperMC') {
                 pluginJarName = 'spigot-vmanager-plugin-1.0.0.jar';
@@ -555,15 +556,13 @@ class ServerController {
                     await fsPromises.mkdir(pluginsDestDir, { recursive: true });
                     const pluginDestPath = path.join(pluginsDestDir, pluginJarName);
                     
-                    if (!fs.existsSync(pluginDestPath)) {
-                         await fsPromises.copyFile(pluginSrcPath, pluginDestPath);
-                         console.log(`[Start Server Check] Added missing companion plugin '${pluginJarName}' to server '${server.name}'.`);
-                    }
+                    await fsPromises.copyFile(pluginSrcPath, pluginDestPath);
+                    console.log(`[Start Server Check] Ensured latest companion plugin '${pluginJarName}' is present for server '${server.name}'.`);
                 } else {
                     console.warn(`[Start Server Check] Companion plugin source JAR not found at ${pluginSrcPath}. It cannot be automatically installed.`);
                 }
             }
-            // --- End plugin add ---
+            // --- End plugin add/update ---
 
             // This block handles cases where the JAR might be missing for simple server types
             const serverJarPath = server.jarFileName ? path.join(serverFolderPath, server.jarFileName) : null;
