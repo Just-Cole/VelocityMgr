@@ -92,7 +92,7 @@ prevent-client-proxy-connections = false
 #                  unable to implement network level firewalling (on a shared host).
 # - "modern":      Forward player IPs and UUIDs as part of the login process using
 #                  Velocity's native forwarding. Only applicable for Minecraft 1.13 or higher.
-player-info-forwarding-mode = "modern"
+player-info-forwarding-mode = "MODERN"
 # If you are using modern or BungeeGuard IP forwarding, configure a file that contains a unique secret here.
 # The file is expected to be UTF-8 encoded and not empty.
 forwarding-secret-file = "forwarding.secret"
@@ -100,7 +100,7 @@ forwarding-secret-file = "forwarding.secret"
 [servers]
 # In what order we should try servers when a player logs in or is kicked from a server.
 # The servers listed here must correspond to a server listed above.
-# try = []
+try = []
 
 [forced-hosts]
 # Configure your forced hosts here.
@@ -110,10 +110,71 @@ forwarding-secret-file = "forwarding.secret"
 # How large a Minecraft packet has to be before we compress it. Setting this to zero will
 # compress all packets, and setting it to -1 will disable compression entirely.
 compression-threshold = 256
+# How much compression should be done (from 0-9). The default is -1, which uses the
+# default level of 6.
+compression-level = -1
+# How fast (in milliseconds) are clients allowed to connect after the last connection? By
+# default, this is three seconds. Disable this by setting this to 0.
+login-ratelimit = 3000
+# Specify a custom timeout for connection timeouts here. The default is five seconds.
+connection-timeout = 5000
+# Specify a read timeout for connections here. The default is 30 seconds.
+read-timeout = 30000
+# Enables compatibility with HAProxy's PROXY protocol. If you don't know what this is for, then
+# don't enable it.
+haproxy-protocol = false
+# Enables TCP fast open support on the proxy. Requires the proxy to run on Linux.
+tcp-fast-open = false
+# Enables BungeeCord plugin messaging channel support on Velocity.
+bungee-plugin-message-channel = true
+# Shows ping requests to the proxy from clients.
+show-ping-requests = false
+# By default, Velocity will attempt to gracefully handle situations where the user unexpectedly
+# loses connection to the server without an explicit disconnect message by attempting to fall the
+# user back, except in the case of read timeouts. BungeeCord will disconnect the user instead. You
+# can disable this setting to use the BungeeCord behavior.
+failover-on-unexpected-server-disconnect = true
+# Declares the proxy commands to 1.13+ clients.
+announce-proxy-commands = true
+# Enables the logging of commands
+log-command-executions = false
+# Enables logging of player connections when connecting to the proxy, switching servers
+# and disconnecting from the proxy.
+log-player-connections = true
+# Allows players transferred from other hosts via the
+# Transfer packet (Minecraft 1.20.5) to be received.
+accepts-transfers = false
+# Enables support for SO_REUSEPORT. This may help the proxy scale better on multicore systems
+# with a lot of incoming connections, and provide better CPU utilization than the existing
+# strategy of having a single thread accepting connections and distributing them to worker
+# threads. Disabled by default. Requires Linux or macOS.
+enable-reuse-port = false
+# How fast (in milliseconds) are clients allowed to send commands after the last command
+# By default this is 50ms (20 commands per second)
+command-rate-limit = 50
+# Should we forward commands to the backend upon being rate limited?
+# This will forward the command to the server instead of processing it on the proxy.
+# Since most server implementations have a rate limit, this will prevent the player
+# from being able to send excessive commands to the server.
+forward-commands-if-rate-limited = true
+# How many commands are allowed to be sent after the rate limit is hit before the player is kicked?
+# Setting this to 0 or lower will disable this feature.
+kick-after-rate-limited-commands = 0
+# How fast (in milliseconds) are clients allowed to send tab completions after the last tab completion
+tab-complete-rate-limit = 10
+# How many tab completions are allowed to be sent after the rate limit is hit before the player is kicked?
+# Setting this to 0 or lower will disable this feature.
+kick-after-rate-limited-tab-completes = 0
 
 [query]
 # Whether to enable responding to GameSpy 4 query responses or not.
 enabled = false
+# If query is enabled, on what port should the query protocol listen on?
+port = 25565
+# This is the map name that is reported to the query services.
+map = "Velocity"
+# Whether plugins should be shown in query response by default or not
+show-plugins = false
 `;
 
 
@@ -140,7 +201,8 @@ class ServerController {
                 const tomlContent = await fsPromises.readFile(tomlPath, 'utf8');
                 tomlConfig = TOML.parse(tomlContent);
             } else {
-                return; // No config to add to
+                console.warn(`[Link Server] velocity.toml not found for proxy ${proxyServer.name}. Cannot link server.`);
+                return;
             }
     
             if (!tomlConfig.servers) tomlConfig.servers = {};
@@ -152,11 +214,11 @@ class ServerController {
             const forcedHostKey = `${serverEntryName}.example.com`;
             tomlConfig['forced-hosts'][forcedHostKey] = [serverEntryName];
 
-            if (!tomlConfig.try) {
-                tomlConfig.try = [];
+            if (!tomlConfig.servers.try) {
+                tomlConfig.servers.try = [];
             }
-            if (tomlConfig.try.length === 0) {
-                tomlConfig.try.push(serverEntryName);
+            if (tomlConfig.servers.try.length === 0) {
+                tomlConfig.servers.try.push(serverEntryName);
             }
     
             await fsPromises.writeFile(tomlPath, TOML.stringify(tomlConfig), 'utf8');
@@ -168,7 +230,7 @@ class ServerController {
     
     async _internalCreateServer(serverDetails) {
         const {
-            serverName,
+            name,
             port,
             serverType,
         } = serverDetails;
@@ -177,8 +239,8 @@ class ServerController {
     
         try {
             let servers = this.indexController._readServers();
-            if (servers.find(s => s.name.toLowerCase() === serverName.toLowerCase())) {
-                throw new Error(`A server with the name "${serverName}" already exists.`);
+            if (servers.find(s => s.name.toLowerCase() === name.toLowerCase())) {
+                throw new Error(`A server with the name "${name}" already exists.`);
             }
             if (servers.find(s => s.port === parseInt(port, 10))) {
                 throw new Error(`A server is already using port ${port}.`);
@@ -198,11 +260,11 @@ class ServerController {
                 throw new Error(`Could not find any builds for ${serverType} version ${serverVersion}.`);
             }
             const buildNumber = latestBuildDetails.build;
-            const fullVersion = buildsResponse.version; // e.g. 1.20, not 1.20.4
+            const fullVersion = buildsResponse.version;
     
             const newServer = {
                 id: uuidv4(),
-                name: serverName,
+                name: name,
                 port: parseInt(port, 10),
                 ip: '127.0.0.1',
                 softwareType: serverType,
@@ -270,18 +332,23 @@ class ServerController {
             return newServer;
     
         } catch (error) {
-            console.error(`[Internal Create] Failed to create server ${serverName}:`, error);
-            // Re-throw to be caught by the main createServer function
+            console.error(`[Internal Create] Failed to create server ${name}:`, error);
             throw error;
         }
     }
     
     async createServer(req, res, next) {
         try {
-            const { serverType, createHubServer, hubVersion } = req.body;
+            const { name, port, serverType, serverVersion, velocityVersion, createHubServer, hubVersion } = req.body;
     
             if (serverType === 'Velocity') {
-                const proxyServer = await this._internalCreateServer(req.body);
+                 const proxyDetails = {
+                    name: name,
+                    port: port,
+                    serverType: serverType,
+                    serverVersion: velocityVersion,
+                };
+                const proxyServer = await this._internalCreateServer(proxyDetails);
                 let hubCreationMessage = '';
 
                 if (createHubServer && hubVersion) {
@@ -290,7 +357,7 @@ class ServerController {
         
                     if (!hubExists) {
                         const hubDetails = {
-                            serverName: 'Hub',
+                            name: 'Hub',
                             port: 25566,
                             serverType: 'PaperMC',
                             serverVersion: hubVersion,
@@ -314,7 +381,13 @@ class ServerController {
                 });
     
             } else { // PaperMC
-                const paperServer = await this._internalCreateServer(req.body);
+                 const paperDetails = {
+                    name: name,
+                    port: port,
+                    serverType: serverType,
+                    serverVersion: serverVersion,
+                };
+                const paperServer = await this._internalCreateServer(paperDetails);
     
                 const allServers = this.indexController._readServers();
                 const proxyServer = allServers.find(s => s.softwareType === 'Velocity');
