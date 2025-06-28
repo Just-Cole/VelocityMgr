@@ -165,16 +165,6 @@ tab-complete-rate-limit = 10
 # How many tab completions are allowed to be sent after the rate limit is hit before the player is kicked?
 # Setting this to 0 or lower will disable this feature.
 kick-after-rate-limited-tab-completes = 0
-
-[query]
-# Whether to enable responding to GameSpy 4 query responses or not.
-enabled = false
-# If query is enabled, on what port should the query protocol listen on?
-port = 25565
-# This is the map name that is reported to the query services.
-map = "Velocity"
-# Whether plugins should be shown in query response by default or not
-show-plugins = false
 `;
 
 
@@ -373,7 +363,7 @@ class ServerController {
     
     async createServer(req, res, next) {
         try {
-            const { name, port, serverType, serverVersion, velocityVersion, createHubServer, hubVersion } = req.body;
+            const { serverName: name, port, serverType, serverVersion, velocityVersion, createHubServer, hubVersion } = req.body;
     
             if (serverType === 'Velocity') {
                  const proxyDetails = {
