@@ -258,9 +258,8 @@ class ServerController {
             port,
             serverType,
             serverVersion,
-            // These are no longer sent from the frontend, but we keep them here for context
-            // paperBuild,
-            // velocityBuild
+            createHubServer,
+            hubVersion,
         } = req.body;
     
         if (!serverName || !port || !serverType || !serverVersion) {
@@ -269,28 +268,23 @@ class ServerController {
     
         try {
             let allServers = this.indexController._readServers();
-            // This is the safety check that prevents crashes on corrupted data.
             const safeServers = allServers.filter(s => s && s.name && s.port);
             
-            if (safeServers.find(s => s.name.toLowerCase() === serverName.toLowerCase())) {
+            if (safeServers.some(s => s.name.toLowerCase() === serverName.toLowerCase())) {
                 return res.status(409).json({ message: `A server with the name "${serverName}" already exists.` });
             }
-            if (safeServers.find(s => s.port === parseInt(port,10))) {
+            if (safeServers.some(s => s.port === parseInt(port,10))) {
                 return res.status(409).json({ message: `A server is already using port ${port}.` });
             }
             
             const isPaper = serverType === 'PaperMC';
             const apiProjectName = isPaper ? 'paper' : 'velocity';
 
-            // Fetch latest build number from PaperMC API
             const buildsResponse = await this.indexController.httpsGetJson(`https://api.papermc.io/v2/projects/${apiProjectName}/versions/${serverVersion}/builds`);
             const latestBuildDetails = buildsResponse.builds.pop();
-            if (!latestBuildDetails) {
-                throw new Error(`Could not find any builds for ${serverType} version ${serverVersion}.`);
-            }
+            if (!latestBuildDetails) throw new Error(`Could not find any builds for ${serverType} version ${serverVersion}.`);
             const buildNumber = latestBuildDetails.build;
             const fullVersionString = buildsResponse.version;
-
 
             const newServer = {
                 id: uuidv4(),
@@ -318,12 +312,10 @@ class ServerController {
     
             if (!fs.existsSync(serverJarPath)) {
                 const downloadUrl = `https://api.papermc.io/v2/projects/${apiProjectName}/versions/${fullVersionString}/builds/${buildNumber}/downloads/${downloadFileName}`;
-                console.log(`[Create Server] JAR not found. Downloading from ${downloadUrl}`);
                 await this.indexController.downloadFile(downloadUrl, serverFolderPath, downloadFileName);
             }
             
             newServer.jarFileName = downloadFileName;
-    
             await fsPromises.writeFile(path.join(serverFolderPath, 'eula.txt'), 'eula=true', 'utf-8');
 
              if (isPaper) {
@@ -331,19 +323,82 @@ class ServerController {
             } else { // Velocity
                 const tomlPath = path.join(serverFolderPath, 'velocity.toml');
                 if (!fs.existsSync(tomlPath)) {
-                    const finalTomlContent = velocityTomlTemplate
-                        .replace(/bind\s*=\s*"0\.0\.0\.0:25565"/, `bind = "0.0.0.0:${newServer.port}"`);
+                    const finalTomlContent = velocityTomlTemplate.replace(/bind\s*=\s*"0\.0\.0\.0:25565"/, `bind = "0.0.0.0:${newServer.port}"`);
                     await fsPromises.writeFile(tomlPath, finalTomlContent.trim(), 'utf-8');
-
                     const secretFilePath = path.join(serverFolderPath, 'forwarding.secret');
                     if (!fs.existsSync(secretFilePath)) {
-                        const secret = crypto.randomBytes(12).toString('hex');
-                        await fsPromises.writeFile(secretFilePath, secret, 'utf-8');
+                        await fsPromises.writeFile(secretFilePath, crypto.randomBytes(12).toString('hex'), 'utf-8');
                     }
                 }
             }
     
             allServers.push(newServer);
+
+            // --- Companion Hub Server Creation ---
+            if (serverType === 'Velocity' && createHubServer && hubVersion) {
+                const hubName = 'Hub';
+                const hubPort = 25566;
+
+                const currentServers = this.indexController._readServers();
+                const hubExists = currentServers.some(s => s && s.name && s.name.toLowerCase() === hubName.toLowerCase());
+                const portInUse = currentServers.some(s => s && s.port === hubPort);
+
+                if (!hubExists && !portInUse) {
+                    const hubPaperBuilds = await this.indexController.httpsGetJson(`https://api.papermc.io/v2/projects/paper/versions/${hubVersion}/builds`);
+                    const latestHubBuild = hubPaperBuilds.builds.pop();
+                    const hubBuildNum = latestHubBuild.build;
+                    
+                    const hubServer = {
+                        id: uuidv4(),
+                        name: hubName,
+                        port: hubPort,
+                        ip: '127.0.0.1',
+                        softwareType: 'PaperMC',
+                        serverVersion: hubVersion,
+                        paperBuild: hubBuildNum,
+                        status: 'Offline',
+                        connectedPlayers: [],
+                        maxPlayers: 20,
+                        minRam: '1024M',
+                        maxRam: '2048M',
+                        description: 'Default Hub server for the network.',
+                        tags: ['hub'],
+                    };
+
+                    const hubFolderPath = this.indexController._getServerFolderPath(hubServer);
+                    await fsPromises.mkdir(hubFolderPath, { recursive: true });
+
+                    const hubJarName = `paper-${hubVersion}-${hubBuildNum}.jar`;
+                    hubServer.jarFileName = hubJarName;
+                    const hubDownloadUrl = `https://api.papermc.io/v2/projects/paper/versions/${hubVersion}/builds/${hubBuildNum}/downloads/${hubJarName}`;
+                    await this.indexController.downloadFile(hubDownloadUrl, hubFolderPath, hubJarName);
+
+                    await fsPromises.writeFile(path.join(hubFolderPath, 'eula.txt'), 'eula=true', 'utf-8');
+                    await this.indexController._updateServerPropertiesPort(hubServer, hubPort);
+                    
+                    allServers.push(hubServer);
+
+                    // Link Hub to Proxy
+                    const tomlPath = path.join(serverFolderPath, 'velocity.toml');
+                    if (fs.existsSync(tomlPath)) {
+                        const tomlContent = await fsPromises.readFile(tomlPath, 'utf8');
+                        const parsedToml = TOML.parse(tomlContent);
+                        if (!parsedToml.servers) parsedToml.servers = {};
+                        parsedToml.servers['hub'] = '127.0.0.1:25566';
+                        if (!parsedToml.try) parsedToml.try = [];
+                        if (!parsedToml.try.includes('hub')) {
+                            parsedToml.try.push('hub');
+                        }
+                        await fsPromises.writeFile(tomlPath, TOML.stringify(parsedToml), 'utf-8');
+                    }
+                    
+                    // Sync forwarding secret
+                    await this.indexController._syncVelocitySecret(hubServer, newServer);
+                } else {
+                     console.warn(`Skipping Hub creation: A server named 'Hub' or a server on port ${hubPort} already exists.`);
+                }
+            }
+    
             this.indexController._writeServers(allServers);
     
             res.status(201).json({
@@ -1254,3 +1309,4 @@ module.exports = ServerController;
 
     
 
+    
