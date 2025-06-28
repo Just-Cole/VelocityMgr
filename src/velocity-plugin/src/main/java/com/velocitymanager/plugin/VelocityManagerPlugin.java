@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
@@ -181,26 +182,28 @@ public class VelocityManagerPlugin {
         return apiService.fetchServers().thenApply(serversFromApi -> {
             ReloadResult result = new ReloadResult();
 
-            Collection<RegisteredServer> registeredServers = server.getAllServers();
-            Set<String> registeredServerNames = registeredServers.stream()
-                .map(s -> s.getServerInfo().getName())
+            // Use a case-insensitive map to look up registered servers by their lowercase name
+            Map<String, RegisteredServer> registeredServerMap = server.getAllServers().stream()
+                .collect(Collectors.toMap(s -> s.getServerInfo().getName().toLowerCase(), s -> s));
+
+            Set<String> configServerNamesLower = serversFromApi.stream()
+                .map(gs -> gs.name().toLowerCase())
                 .collect(Collectors.toSet());
 
-            Set<String> configServerNames = serversFromApi.stream()
-                .map(GameServer::name)
-                .collect(Collectors.toSet());
-
-            for (RegisteredServer registeredServer : registeredServers) {
-                String serverName = registeredServer.getServerInfo().getName();
-                if (!configServerNames.contains(serverName)) {
-                    server.unregisterServer(registeredServer.getServerInfo());
-                    logger.info("Unregistered server '" + serverName + "' as it's no longer in the config.");
+            // Unregister servers that are no longer in the config
+            for (Map.Entry<String, RegisteredServer> entry : registeredServerMap.entrySet()) {
+                String lowerCaseName = entry.getKey();
+                if (!configServerNamesLower.contains(lowerCaseName)) {
+                    server.unregisterServer(entry.getValue().getServerInfo());
+                    logger.info("Unregistered server '" + entry.getValue().getServerInfo().getName() + "' as it's no longer in the config.");
                     result.removed++;
                 }
             }
 
+            // Register new servers from the config
             for (GameServer serverFromApi : serversFromApi) {
-                if (!registeredServerNames.contains(serverFromApi.name())) {
+                String lowerCaseName = serverFromApi.name().toLowerCase();
+                if (!registeredServerMap.containsKey(lowerCaseName)) {
                     InetSocketAddress address = new InetSocketAddress(serverFromApi.ip(), serverFromApi.port());
                     ServerInfo serverInfo = new ServerInfo(serverFromApi.name(), address);
                     server.registerServer(serverInfo);
