@@ -273,10 +273,10 @@ class ServerController {
     
         try {
             let servers = this.indexController._readServers();
-            if (servers.find(s => s.name.toLowerCase() === name.toLowerCase())) {
+            if (servers.find(s => s && s.name && s.name.toLowerCase() === name.toLowerCase())) {
                 throw new Error(`A server with the name "${name}" already exists.`);
             }
-            if (servers.find(s => s.port === parseInt(port, 10))) {
+            if (servers.find(s => s && s.port === parseInt(port, 10))) {
                 throw new Error(`A server is already using port ${port}.`);
             }
     
@@ -387,7 +387,7 @@ class ServerController {
 
                 if (createHubServer && hubVersion) {
                     const allServers = this.indexController._readServers();
-                    const hubExists = allServers.some(s => s.name.toLowerCase() === 'hub' || s.port === 25566);
+                    const hubExists = allServers.some(s => s && s.name && (s.name.toLowerCase() === 'hub' || s.port === 25566));
         
                     if (!hubExists) {
                         const hubDetails = {
@@ -424,7 +424,7 @@ class ServerController {
                 const paperServer = await this._internalCreateServer(paperDetails);
     
                 const allServers = this.indexController._readServers();
-                const proxyServer = allServers.find(s => s.softwareType === 'Velocity');
+                const proxyServer = allServers.find(s => s && s.softwareType === 'Velocity');
                 if (proxyServer) {
                     await this._addServerToProxyConfig(paperServer, proxyServer);
                     await this.indexController._syncVelocitySecret(paperServer, proxyServer);
@@ -480,7 +480,7 @@ class ServerController {
         
         try {
             let servers = this.indexController._readServers();
-            if (servers.find(s => s.name.toLowerCase() === serverName.toLowerCase() || s.port === parseInt(port, 10))) {
+            if (servers.find(s => s && s.name && (s.name.toLowerCase() === serverName.toLowerCase() || s.port === parseInt(port, 10)))) {
                 return res.status(409).json({ message: 'A server with that name or port already exists.' });
             }
 
