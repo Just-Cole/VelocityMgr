@@ -252,51 +252,53 @@ class ServerController {
         }
     }
     
-    async _internalCreateServer(serverDetails) {
+    async createServer(req, res, next) {
         const {
-            name,
+            serverName,
             port,
             serverType,
-        } = serverDetails;
+            serverVersion,
+            // These are no longer sent from the frontend, but we keep them here for context
+            // paperBuild,
+            // velocityBuild
+        } = req.body;
     
-        let { serverVersion } = serverDetails;
-
-        if (!name || typeof name !== 'string' || name.trim().length === 0) {
-            throw new Error("Internal error: A server name must be provided to create a server.");
+        if (!serverName || !port || !serverType || !serverVersion) {
+            return res.status(400).json({ message: "Missing required fields for server creation." });
         }
     
         try {
-            let servers = this.indexController._readServers();
-            if (servers.find(s => s && s.name && s.name.toLowerCase() === name.toLowerCase())) {
-                throw new Error(`A server with the name "${name}" already exists.`);
+            let allServers = this.indexController._readServers();
+            // This is the safety check that prevents crashes on corrupted data.
+            const safeServers = allServers.filter(s => s && s.name && s.port);
+            
+            if (safeServers.find(s => s.name.toLowerCase() === serverName.toLowerCase())) {
+                return res.status(409).json({ message: `A server with the name "${serverName}" already exists.` });
             }
-            if (servers.find(s => s && s.port === parseInt(port, 10))) {
-                throw new Error(`A server is already using port ${port}.`);
+            if (safeServers.find(s => s.port === parseInt(port,10))) {
+                return res.status(409).json({ message: `A server is already using port ${port}.` });
             }
-    
+            
             const isPaper = serverType === 'PaperMC';
             const apiProjectName = isPaper ? 'paper' : 'velocity';
-    
-            if (!serverVersion) {
-                const versionData = await this.indexController.httpsGetJson(`https://api.papermc.io/v2/projects/${apiProjectName}`);
-                serverVersion = versionData.versions.pop();
-            }
-    
+
+            // Fetch latest build number from PaperMC API
             const buildsResponse = await this.indexController.httpsGetJson(`https://api.papermc.io/v2/projects/${apiProjectName}/versions/${serverVersion}/builds`);
             const latestBuildDetails = buildsResponse.builds.pop();
             if (!latestBuildDetails) {
                 throw new Error(`Could not find any builds for ${serverType} version ${serverVersion}.`);
             }
             const buildNumber = latestBuildDetails.build;
-            const fullVersion = buildsResponse.version;
-    
+            const fullVersionString = buildsResponse.version;
+
+
             const newServer = {
                 id: uuidv4(),
-                name: name,
+                name: serverName,
                 port: parseInt(port, 10),
                 ip: '127.0.0.1',
                 softwareType: serverType,
-                serverVersion: serverVersion,
+                serverVersion: fullVersionString,
                 paperBuild: isPaper ? buildNumber : undefined,
                 velocityBuild: !isPaper ? buildNumber : undefined,
                 status: 'Offline',
@@ -311,25 +313,28 @@ class ServerController {
             const serverFolderPath = this.indexController._getServerFolderPath(newServer);
             await fsPromises.mkdir(serverFolderPath, { recursive: true });
     
-            const downloadFileName = `${apiProjectName}-${fullVersion}-${buildNumber}.jar`;
+            const downloadFileName = `${apiProjectName}-${fullVersionString}-${buildNumber}.jar`;
             const serverJarPath = path.join(serverFolderPath, downloadFileName);
+    
             if (!fs.existsSync(serverJarPath)) {
-                const downloadUrl = `https://api.papermc.io/v2/projects/${apiProjectName}/versions/${fullVersion}/builds/${buildNumber}/downloads/${downloadFileName}`;
+                const downloadUrl = `https://api.papermc.io/v2/projects/${apiProjectName}/versions/${fullVersionString}/builds/${buildNumber}/downloads/${downloadFileName}`;
+                console.log(`[Create Server] JAR not found. Downloading from ${downloadUrl}`);
                 await this.indexController.downloadFile(downloadUrl, serverFolderPath, downloadFileName);
             }
+            
             newServer.jarFileName = downloadFileName;
     
             await fsPromises.writeFile(path.join(serverFolderPath, 'eula.txt'), 'eula=true', 'utf-8');
-    
-            if (isPaper) {
+
+             if (isPaper) {
                 await this.indexController._updateServerPropertiesPort(newServer, newServer.port);
-            } else {
+            } else { // Velocity
                 const tomlPath = path.join(serverFolderPath, 'velocity.toml');
                 if (!fs.existsSync(tomlPath)) {
                     const finalTomlContent = velocityTomlTemplate
                         .replace(/bind\s*=\s*"0\.0\.0\.0:25565"/, `bind = "0.0.0.0:${newServer.port}"`);
                     await fsPromises.writeFile(tomlPath, finalTomlContent.trim(), 'utf-8');
-    
+
                     const secretFilePath = path.join(serverFolderPath, 'forwarding.secret');
                     if (!fs.existsSync(secretFilePath)) {
                         const secret = crypto.randomBytes(12).toString('hex');
@@ -338,101 +343,14 @@ class ServerController {
                 }
             }
     
-            let pluginJarName, pluginSrcPath;
-            if (isPaper) {
-                pluginJarName = 'spigot-vmanager-plugin-1.0.0.jar';
-                pluginSrcPath = path.join(__dirname, '..', '..', '..', 'spigot-plugin', 'target', pluginJarName);
-            } else {
-                pluginJarName = 'velocity-manager-plugin-1.0.0.jar';
-                pluginSrcPath = path.join(__dirname, '..', '..', '..', 'velocity-plugin', 'target', pluginJarName);
-            }
-    
-            if (pluginJarName && pluginSrcPath && fs.existsSync(pluginSrcPath)) {
-                const pluginsDestDir = path.join(serverFolderPath, 'plugins');
-                await fsPromises.mkdir(pluginsDestDir, { recursive: true });
-                await fsPromises.copyFile(pluginSrcPath, path.join(pluginsDestDir, pluginJarName));
-            }
-    
-            let allServers = this.indexController._readServers();
             allServers.push(newServer);
             this.indexController._writeServers(allServers);
     
-            return newServer;
+            res.status(201).json({
+                message: `Server "${newServer.name}" created successfully. You can now manage it from the dashboard.`,
+                server: newServer,
+            });
     
-        } catch (error) {
-            console.error(`[Internal Create] Failed to create server ${name}:`, error);
-            throw error;
-        }
-    }
-    
-    async createServer(req, res, next) {
-        try {
-            const { serverName, port, serverType, serverVersion, createHubServer, hubVersion } = req.body;
-    
-            if (serverType === 'Velocity') {
-                 const proxyDetails = {
-                    name: serverName,
-                    port: parseInt(port, 10),
-                    serverType: 'Velocity',
-                    serverVersion: serverVersion,
-                };
-                const proxyServer = await this._internalCreateServer(proxyDetails);
-                let hubCreationMessage = '';
-
-                if (createHubServer && hubVersion) {
-                    const allServers = this.indexController._readServers();
-                    const hubExists = allServers.some(s => (s && s.name && s.name.toLowerCase() === 'hub') || (s && s.port === 25566));
-        
-                    if (!hubExists) {
-                        const hubDetails = {
-                            name: 'Hub',
-                            port: 25566,
-                            serverType: 'PaperMC',
-                            serverVersion: hubVersion,
-                        };
-                        try {
-                            const hubServer = await this._internalCreateServer(hubDetails);
-                            await this._addServerToProxyConfig(hubServer, proxyServer);
-                            await this.indexController._syncVelocitySecret(hubServer, proxyServer);
-                            hubCreationMessage = 'Companion Hub server was also created and linked.';
-                        } catch (hubError) {
-                            hubCreationMessage = `Warning: Failed to create companion Hub server. Error: ${hubError.message}`;
-                        }
-                    } else {
-                        hubCreationMessage = 'A server named "Hub" or using port 25566 already exists. Skipping Hub creation.';
-                    }
-                }
-                
-                res.status(201).json({
-                    message: `Velocity proxy "${proxyServer.name}" created. ${hubCreationMessage}`,
-                    server: proxyServer,
-                });
-    
-            } else { // PaperMC
-                 const paperDetails = {
-                    name: serverName,
-                    port: parseInt(port, 10),
-                    serverType: 'PaperMC',
-                    serverVersion,
-                };
-                const paperServer = await this._internalCreateServer(paperDetails);
-    
-                const allServers = this.indexController._readServers();
-                const proxyServer = allServers.find(s => s && s.softwareType === 'Velocity');
-                if (proxyServer) {
-                    await this._addServerToProxyConfig(paperServer, proxyServer);
-                    await this.indexController._syncVelocitySecret(paperServer, proxyServer);
-                    res.status(201).json({
-                        message: `Server "${paperServer.name}" created and linked to proxy. Restart the proxy to apply.`,
-                        server: paperServer,
-                    });
-                } else {
-                    res.status(201).json({
-                        message: `Server "${paperServer.name}" created successfully.`,
-                        server: paperServer,
-                    });
-                }
-            }
         } catch (error) {
             next(error);
         }
@@ -1335,3 +1253,4 @@ module.exports = ServerController;
 
 
     
+
