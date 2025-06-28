@@ -260,6 +260,10 @@ class ServerController {
         } = serverDetails;
     
         let { serverVersion } = serverDetails;
+
+        if (!name || typeof name !== 'string' || name.trim().length === 0) {
+            throw new Error("Internal error: A server name must be provided to create a server.");
+        }
     
         try {
             let servers = this.indexController._readServers();
@@ -363,14 +367,14 @@ class ServerController {
     
     async createServer(req, res, next) {
         try {
-            const { serverName: name, port, serverType, serverVersion, velocityVersion, createHubServer, hubVersion } = req.body;
+            const { serverName, port, serverType, serverVersion, createHubServer, hubVersion } = req.body;
     
             if (serverType === 'Velocity') {
                  const proxyDetails = {
-                    name,
+                    name: serverName,
                     port: parseInt(port, 10),
                     serverType: 'Velocity',
-                    serverVersion: velocityVersion,
+                    serverVersion: serverVersion,
                 };
                 const proxyServer = await this._internalCreateServer(proxyDetails);
                 let hubCreationMessage = '';
@@ -406,7 +410,7 @@ class ServerController {
     
             } else { // PaperMC
                  const paperDetails = {
-                    name,
+                    name: serverName,
                     port: parseInt(port, 10),
                     serverType: 'PaperMC',
                     serverVersion,
