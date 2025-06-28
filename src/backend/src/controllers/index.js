@@ -391,9 +391,41 @@ class IndexController {
 
     _readServers() {
         try {
-            if (fs.existsSync(SERVERS_FILE_PATH)) return JSON.parse(fs.readFileSync(SERVERS_FILE_PATH, 'utf-8'));
+            if (fs.existsSync(SERVERS_FILE_PATH)) {
+                let servers;
+                try {
+                    servers = JSON.parse(fs.readFileSync(SERVERS_FILE_PATH, 'utf-8'));
+                } catch (e) {
+                    console.error(`[Data Repair] Failed to parse ${SERVERS_FILE_PATH}. Moving to .corrupted and starting fresh.`, e);
+                    fs.renameSync(SERVERS_FILE_PATH, `${SERVERS_FILE_PATH}.${Date.now()}.corrupted`);
+                    return [];
+                }
+
+                if (!Array.isArray(servers)) {
+                    console.warn(`[Data Repair] ${SERVERS_FILE_PATH} is not an array. Resetting to empty.`);
+                    this._writeServers([]);
+                    return [];
+                }
+
+                let needsRewrite = false;
+                const repairedServers = servers.map(server => {
+                    if (server && typeof server === 'object' && !server.name) {
+                        console.warn(`[Data Repair] Found a server with no name (ID: ${server.id || 'N/A'}). Assigning a placeholder name.`);
+                        server.name = `Unnamed Server`;
+                        needsRewrite = true;
+                    }
+                    return server;
+                }).filter(server => server && typeof server === 'object'); // Filter out null/bad entries
+
+                if (needsRewrite) {
+                    console.log("[Data Repair] Rewriting servers.json to fix missing names.");
+                    this._writeServers(repairedServers);
+                }
+                return repairedServers;
+            }
             return [];
         } catch (error) {
+            console.error("Critical error in _readServers. Returning empty list.", error);
             return [];
         }
     }
