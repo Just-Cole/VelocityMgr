@@ -381,7 +381,7 @@ class ServerController {
 
                 if (createHubServer && hubVersion) {
                     const allServers = this.indexController._readServers();
-                    const hubExists = allServers.some(s => s && typeof s.name === 'string' && (s.name.toLowerCase() === 'hub' || s.port === 25566));
+                    const hubExists = allServers.some(s => (s && s.name && s.name.toLowerCase() === 'hub') || (s && s.port === 25566));
         
                     if (!hubExists) {
                         const hubDetails = {
