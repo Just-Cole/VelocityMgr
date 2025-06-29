@@ -290,7 +290,19 @@ class ServerController {
             await fsPromises.writeFile(path.join(serverFolderPath, 'eula.txt'), 'eula=true', 'utf-8');
 
              if (isPaper) {
-                await this.indexController._updateServerPropertiesPort(newServer, newServer.port);
+                const serverPropsPath = path.join(serverFolderPath, 'server.properties');
+                const propsToSet = { 'server-port': newServer.port };
+                if (linkToProxy && linkToProxy !== 'none') {
+                    propsToSet['online-mode'] = false;
+                }
+                let existingContent = '';
+                if (fs.existsSync(serverPropsPath)) {
+                    existingContent = await fsPromises.readFile(serverPropsPath, 'utf-8');
+                }
+                let props = parseServerProperties(existingContent);
+                props = { ...props, ...propsToSet };
+                const newContent = formatServerProperties(props, existingContent);
+                await fsPromises.writeFile(serverPropsPath, newContent, 'utf-8');
             } else { // Velocity
                 const tomlPath = path.join(serverFolderPath, 'velocity.toml');
                 if (!fs.existsSync(tomlPath)) {
@@ -355,7 +367,20 @@ class ServerController {
                     await this.indexController.downloadFile(hubDownloadUrl, hubFolderPath, hubJarName);
 
                     await fsPromises.writeFile(path.join(hubFolderPath, 'eula.txt'), 'eula=true', 'utf-8');
-                    await this.indexController._updateServerPropertiesPort(hubServer, hubPort);
+                    
+                    const hubPropsPath = path.join(hubFolderPath, 'server.properties');
+                    const hubPropsToSet = {
+                        'server-port': hubPort,
+                        'online-mode': false, // Hub for a proxy must be offline mode.
+                    };
+                    let hubExistingContent = '';
+                    if (fs.existsSync(hubPropsPath)) {
+                        hubExistingContent = await fsPromises.readFile(hubPropsPath, 'utf-8');
+                    }
+                    let hubProps = parseServerProperties(hubExistingContent);
+                    hubProps = { ...hubProps, ...hubPropsToSet };
+                    const newHubContent = formatServerProperties(hubProps, hubExistingContent);
+                    await fsPromises.writeFile(hubPropsPath, newHubContent, 'utf-8');
                     
                     allServers.push(hubServer);
 
