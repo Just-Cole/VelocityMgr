@@ -711,55 +711,38 @@ class IndexController {
     }
 
     async _syncVelocitySecret(paperServer, velocityProxy) {
-        console.log(`[Secret Sync] Starting secret sync for ${paperServer.name} with proxy ${velocityProxy.name}.`);
-        const proxyPath = this._getServerFolderPath(velocityProxy);
+        console.log(`[Secret Sync] Writing specified paper-global.yml for ${paperServer.name}.`);
         const paperServerPath = this._getServerFolderPath(paperServer);
-    
-        if (!proxyPath || !paperServerPath) {
-            console.error(`[Secret Sync] Could not determine folder path for server or proxy.`);
+
+        if (!paperServerPath) {
+            console.error(`[Secret Sync] Could not determine folder path for server.`);
             return;
         }
-    
-        const secretFilePath = path.join(proxyPath, 'forwarding.secret');
-        let secret = '';
-    
-        try {
-            if (fs.existsSync(secretFilePath)) {
-                secret = await fsPromises.readFile(secretFilePath, 'utf-8');
-            } else {
-                console.warn(`[Secret Sync] forwarding.secret not found for proxy ${velocityProxy.name}. Cannot sync secret to ${paperServer.name}. Please start the proxy once to generate it.`);
-                return;
-            }
-            secret = secret.trim();
 
-            if (!secret) {
-                console.warn(`[Secret Sync] forwarding.secret for proxy ${velocityProxy.name} is empty. Cannot sync secret to ${paperServer.name}.`);
-                return;
-            }
-    
+        try {
             const paperConfigDir = path.join(paperServerPath, 'config');
             const paperGlobalYmlPath = path.join(paperConfigDir, 'paper-global.yml');
-    
-            await fsPromises.mkdir(paperConfigDir, { recursive: true });
-    
+
+            await fsPromises.mkdir(paperConfigDir, {
+                recursive: true
+            });
+
             const defaultConfig = `
-# This file is configured to work with Velocity.
-settings:
-  proxy-protocol: false
 proxies:
-  velocity:
-    enabled: true
-    online-mode: true
-    secret: "${secret}"
   bungee-cord:
     online-mode: true
-`;
-    
-            await fsPromises.writeFile(paperGlobalYmlPath, defaultConfig.trim(), 'utf-8');
-            console.log(`[Secret Sync] Successfully wrote forwarding secret to ${paperServer.name}'s paper-global.yml.`);
-    
+  proxy-protocol: false
+  velocity:
+    enabled: false
+    online-mode: true
+    secret: ''
+`.trim();
+
+            await fsPromises.writeFile(paperGlobalYmlPath, defaultConfig, 'utf-8');
+            console.log(`[Secret Sync] Successfully wrote specified paper-global.yml for ${paperServer.name}.`);
+
         } catch (error) {
-            console.error(`[Secret Sync] Failed to sync Velocity secret for server ${paperServer.name}:`, error);
+            console.error(`[Secret Sync] Failed to write paper-global.yml for server ${paperServer.name}:`, error);
         }
     }
 }
