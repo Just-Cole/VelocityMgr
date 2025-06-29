@@ -194,58 +194,26 @@ class ServerController {
                 return;
             }
 
+            const parsedToml = TOML.parse(tomlContent);
+            if (!parsedToml.servers) parsedToml.servers = {};
+            
             const serverEntryName = serverToAdd.name.toLowerCase().replace(/[^a-z0-9]/g, '');
             const serverAddress = `${serverToAdd.ip}:${serverToAdd.port}`;
 
-            // Use regex to be more robust against formatting variations
-            const serversSectionRegex = /(\[servers\]\s*[\s\S]*?)(?=\n\[|$)/;
-            const tryLineRegex = /try\s*=\s*(\[.*\])/;
+            parsedToml.servers[serverEntryName] = serverAddress;
 
-            let newTomlContent = tomlContent;
-
-            if (serversSectionRegex.test(newTomlContent)) {
-                 newTomlContent = newTomlContent.replace(serversSectionRegex, (match, serversSection) => {
-                    let newSection = serversSection;
-                    // Add the server if it doesn't exist
-                    if (!newSection.includes(`${serverEntryName} =`)) {
-                        newSection = newSection.trimEnd() + `\n${serverEntryName} = "${serverAddress}"\n`;
-                    }
-                    // Handle the 'try' array
-                    if (tryLineRegex.test(newSection)) {
-                        newSection = newSection.replace(tryLineRegex, (tryMatch, tryArrayString) => {
-                            try {
-                                const tryArray = JSON.parse(tryArrayString.replace(/'/g, '"'));
-                                if (!tryArray.includes(serverEntryName)) {
-                                    tryArray.push(serverEntryName);
-                                    return `try = ${JSON.stringify(tryArray).replace(/"/g, "'")}`;
-                                }
-                                return tryMatch;
-                            } catch (e) { return tryMatch; } // Fallback on parse error
-                        });
-                    } else {
-                        newSection += `try = ['${serverEntryName}']\n`;
-                    }
-                    return newSection;
-                });
-            } else {
-                newTomlContent += `\n[servers]\ntry = ["${serverEntryName}"]\n${serverEntryName} = "${serverAddress}"\n`;
+            if (!parsedToml.try) parsedToml.try = [];
+            if (!parsedToml.try.includes(serverEntryName)) {
+                parsedToml.try.push(serverEntryName);
+            }
+            
+            if (!parsedToml['forced-hosts']) parsedToml['forced-hosts'] = {};
+            const forcedHostKey = `${serverEntryName}.example.com`;
+            if (!parsedToml['forced-hosts'][forcedHostKey]) {
+                parsedToml['forced-hosts'][forcedHostKey] = [serverEntryName];
             }
 
-            const forcedHostsSectionRegex = /(\[forced-hosts\]\s*[\s\S]*?)(?=\n\[|$)/;
-            const forcedHostEntry = `"${serverEntryName}.example.com" = ["${serverEntryName}"]`;
-
-            if(forcedHostsSectionRegex.test(newTomlContent)) {
-                 newTomlContent = newTomlContent.replace(forcedHostsSectionRegex, (match) => {
-                    if (!match.includes(forcedHostEntry)) {
-                        return match.trimEnd() + `\n${forcedHostEntry}\n`;
-                    }
-                    return match;
-                });
-            } else {
-                newTomlContent += `\n[forced-hosts]\n${forcedHostEntry}\n`;
-            }
-
-            await fsPromises.writeFile(tomlPath, newTomlContent, 'utf8');
+            await fsPromises.writeFile(tomlPath, TOML.stringify(parsedToml), 'utf8');
             console.log(`[Link Server] Successfully added new server '${serverToAdd.name}' to proxy '${proxyServer.name}' config.`);
         } catch (tomlError) {
             console.error(`[Link Server] Failed to update proxy config for new server:`, tomlError);
@@ -260,6 +228,7 @@ class ServerController {
             serverVersion,
             createHubServer,
             hubVersion,
+            linkToProxy,
         } = req.body;
     
         if (!serverName || !port || !serverType || !serverVersion) {
@@ -333,14 +302,25 @@ class ServerController {
     
             allServers.push(newServer);
 
+            // --- Link to existing proxy if requested ---
+            if (linkToProxy && linkToProxy !== 'none' && newServer.softwareType === 'PaperMC') {
+                const proxyServer = allServers.find(s => s.id === linkToProxy && s.softwareType === 'Velocity');
+                if (proxyServer) {
+                    console.log(`[Create Server] Linking new server '${newServer.name}' to proxy '${proxyServer.name}'.`);
+                    await this._addServerToProxyConfig(newServer, proxyServer);
+                    await this.indexController._syncVelocitySecret(newServer, proxyServer);
+                } else {
+                    console.warn(`[Create Server] Could not find proxy with ID ${linkToProxy} to link the new server to.`);
+                }
+            }
+
             // --- Companion Hub Server Creation ---
             if (serverType === 'Velocity' && createHubServer && hubVersion) {
                 const hubName = 'Hub';
                 const hubPort = 25566;
 
-                const currentServers = this.indexController._readServers();
-                const hubExists = currentServers.some(s => s && s.name && s.name.toLowerCase() === hubName.toLowerCase());
-                const portInUse = currentServers.some(s => s && s.port === hubPort);
+                const hubExists = allServers.some(s => s && s.name && s.name.toLowerCase() === hubName.toLowerCase());
+                const portInUse = allServers.some(s => s && s.port === hubPort);
 
                 if (!hubExists && !portInUse) {
                     const hubPaperBuilds = await this.indexController.httpsGetJson(`https://api.papermc.io/v2/projects/paper/versions/${hubVersion}/builds`);
@@ -377,18 +357,7 @@ class ServerController {
                     allServers.push(hubServer);
 
                     // Link Hub to Proxy
-                    const tomlPath = path.join(serverFolderPath, 'velocity.toml');
-                    if (fs.existsSync(tomlPath)) {
-                        const tomlContent = await fsPromises.readFile(tomlPath, 'utf8');
-                        const parsedToml = TOML.parse(tomlContent);
-                        if (!parsedToml.servers) parsedToml.servers = {};
-                        parsedToml.servers['hub'] = '127.0.0.1:25566';
-                        if (!parsedToml.try) parsedToml.try = [];
-                        if (!parsedToml.try.includes('hub')) {
-                            parsedToml.try.push('hub');
-                        }
-                        await fsPromises.writeFile(tomlPath, TOML.stringify(parsedToml), 'utf-8');
-                    }
+                    await this._addServerToProxyConfig(hubServer, newServer);
                     
                     // Sync forwarding secret
                     await this.indexController._syncVelocitySecret(hubServer, newServer);
@@ -1294,3 +1263,4 @@ module.exports = ServerController;
     
 
     
+

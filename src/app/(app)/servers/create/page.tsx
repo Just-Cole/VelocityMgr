@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Save, Loader2, Upload, Search, Package, Server, CheckCircle, Download } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Textarea } from "@/components/ui/textarea";
-import type { ModrinthProject, ModrinthVersion } from "@/lib/types";
+import type { ModrinthProject, ModrinthVersion, GameServer } from "@/lib/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { getRamSuggestion } from '@/actions/modpack';
@@ -69,6 +69,9 @@ const serverSchema = z.object({
   // Companion Hub fields
   createHubServer: z.boolean().optional(),
   hubVersion: z.string().optional(),
+  
+  // Link to existing proxy
+  linkToProxy: z.string().optional(),
 
 }).superRefine((data, ctx) => {
   if (data.networkSetupType === "single_server") {
@@ -131,6 +134,10 @@ export default function CreateServerPage() {
   const [isLoadingModpackVersions, setIsLoadingModpackVersions] = React.useState(false);
   const [isSuggestingRam, setIsSuggestingRam] = React.useState(false);
 
+  // Proxy linking state
+  const [proxies, setProxies] = React.useState<GameServer[]>([]);
+  const [isLoadingProxies, setIsLoadingProxies] = React.useState(false);
+
   const {
     control,
     handleSubmit,
@@ -154,6 +161,7 @@ export default function CreateServerPage() {
       maxRam: "2048M",
       createHubServer: true,
       hubVersion: "",
+      linkToProxy: "none",
     },
   });
 
@@ -208,6 +216,28 @@ export default function CreateServerPage() {
     };
     fetchVeloVersions();
   }, [selectedNetworkSetupType, selectedServerType, velocityVersions.length, toast]);
+
+  // Fetch existing proxies when PaperMC is selected
+  React.useEffect(() => {
+    if (selectedNetworkSetupType !== 'single_server' || selectedServerType !== 'PaperMC') {
+        setProxies([]);
+        return;
+    }
+    const fetchProxies = async () => {
+        setIsLoadingProxies(true);
+        try {
+            const res = await fetch('/api/minecraft/servers');
+            if (!res.ok) throw new Error("Failed to fetch server list for proxies");
+            const allServers: GameServer[] = await res.json();
+            setProxies(allServers.filter(s => s.softwareType === 'Velocity'));
+        } catch (err) {
+            toast({ title: "Proxy Fetch Error", description: "Could not load existing proxies.", variant: "destructive" });
+        } finally {
+            setIsLoadingProxies(false);
+        }
+    }
+    fetchProxies();
+  }, [selectedNetworkSetupType, selectedServerType, toast]);
   
   const handleSetupTypeChange = (value: string) => {
     const currentValues = watch();
@@ -374,6 +404,7 @@ export default function CreateServerPage() {
         serverVersion: data.serverType === 'PaperMC' ? data.version : data.velocityVersion,
         createHubServer: data.createHubServer,
         hubVersion: data.hubVersion,
+        linkToProxy: data.linkToProxy,
       };
     }
     
@@ -637,6 +668,26 @@ export default function CreateServerPage() {
                       <p className="text-xs text-muted-foreground mt-1">The latest build for this version will be used.</p>
                       {errors.version && <p className="text-sm text-destructive mt-1">{errors.version.message}</p>}
                     </div>
+
+                    {proxies.length > 0 && (
+                      <div className="pt-2">
+                          <Label htmlFor="linkToProxy">Link to Existing Proxy (Optional)</Label>
+                          <Controller name="linkToProxy" control={control} render={({ field }) => (
+                              <Select onValueChange={field.onChange} value={field.value} defaultValue="none">
+                                  <SelectTrigger id="linkToProxy" className="mt-1">
+                                      <SelectValue placeholder="Do not link to a proxy" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                      <SelectItem value="none">None</SelectItem>
+                                      {proxies.map(proxy => (
+                                          <SelectItem key={proxy.id} value={proxy.id}>{proxy.name} ({proxy.ip}:{proxy.port})</SelectItem>
+                                      ))}
+                                  </SelectContent>
+                              </Select>
+                          )} />
+                          <p className="text-xs text-muted-foreground mt-1">Automatically adds this server to the selected proxy's config.</p>
+                      </div>
+                    )}
                   </>
                 )}
                 {selectedServerType === "Velocity" && (
