@@ -452,12 +452,12 @@ export default function EditServerPage() {
       return;
     }
     
-    const { try: tryArray, ...serverEntries } = parsedServersConfig || { try: [] };
+    const { try: tryArray = [], ...serverEntries } = parsedServersConfig || {};
 
     const newTomlData = {
         ...velocityToml,
         servers: serverEntries,
-        try: tryArray || [],
+        try: tryArray,
         'forced-hosts': parsedForcedHosts,
     };
 
@@ -1733,6 +1733,8 @@ export default function EditServerPage() {
     </div>
   );
 }
+    
+
     
 
     
