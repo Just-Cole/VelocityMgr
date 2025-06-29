@@ -259,7 +259,7 @@ class ServerController {
 config-version = "2.7"
 
 # What port should the proxy be bound to? By default, we'll bind to all addresses on port 25565.
-bind = "0.0.0.0:${newServer.port}"
+bind = "0.0.0.0:25565"
 
 # What should be the MOTD? This gets displayed when the player adds your server to
 # their server list. Only MiniMessage format is accepted.
@@ -330,11 +330,9 @@ sample-players-in-ping = false
 
 # If not enabled (default is true) player IP addresses will be replaced by <ip address withheld> in logs
 enable-player-address-logging = true
-                `.trim();
+                `;
 
-                let serversSection = '';
-                if (createHubServer) {
-                    serversSection = `
+                const serversWithHubTemplate = `
 [servers]
 # Configure your servers here. Each key represents the server's name, and the value
 # represents the IP address of the server to connect to.
@@ -350,9 +348,9 @@ try = [
 "Hub.example.com" = [
     "Hub"
 ]
-                    `.trim();
-                } else {
-                    serversSection = `
+                `;
+
+                const serversWithoutHubTemplate = `
 [servers]
 # Configure your servers here. Each key represents the server's name, and the value
 # represents the IP address of the server to connect to.
@@ -360,19 +358,14 @@ try = [
 # lobby = "127.0.0.1:25567"
 
 # In what order we should try servers when a player logs in or is kicked from a server.
-try = [
-    # "lobby"
-]
+try = [ ]
 
 [forced-hosts]
 # Configure your forced hosts here.
-# "lobby.example.com" = [
-#     "lobby"
-# ]
-                    `.trim();
-                }
-                
-                const advancedSection = `
+# "lobby.example.com" = [ "lobby" ]
+                `;
+
+                const advancedTemplate = `
 [advanced]
 # How large a Minecraft packet has to be before we compress it. Setting this to zero will
 # compress all packets, and setting it to -1 will disable compression entirely.
@@ -451,27 +444,36 @@ tab-complete-rate-limit = 10
 # How many tab completions are allowed to be sent after the rate limit is hit before the player is kicked?
 # Setting this to 0 or lower will disable this feature.
 kick-after-rate-limited-tab-completes = 0
-                `.trim();
-                
-                const querySection = `
+`;
+
+                const queryTemplate = `
 [query]
 # Whether to enable responding to GameSpy 4 query responses or not.
 enabled = false
 
 # If query is enabled, on what port should the query protocol listen on?
-port = ${newServer.port}
+port = 25565
 
 # This is the map name that is reported to the query services.
 map = "Velocity"
 
 # Whether plugins should be shown in query response by default or not
 show-plugins = false
-                `.trim();
+                `;
 
-                const tomlContent = `${baseTemplate}\n\n${serversSection}\n\n${advancedSection}\n\n${querySection}`;
+                let finalTemplate = baseTemplate;
+                if (createHubServer) {
+                    finalTemplate += `\n\n${serversWithHubTemplate}`;
+                } else {
+                    finalTemplate += `\n\n${serversWithoutHubTemplate}`;
+                }
+                finalTemplate += `\n\n${advancedTemplate}\n\n${queryTemplate}`;
+
+                const tomlContent = finalTemplate
+                    .replace('bind = "0.0.0.0:25565"', `bind = "0.0.0.0:${newServer.port}"`)
+                    .replace('port = 25565', `port = ${newServer.port}`);
                 
-                await fsPromises.writeFile(tomlPath, tomlContent, 'utf-8');
-                console.log(`[Create Server] Wrote velocity.toml for ${newServer.name} using predefined template.`);
+                await fsPromises.writeFile(tomlPath, tomlContent.trim(), 'utf-8');
             }
     
             allServers.push(newServer);
@@ -1447,6 +1449,7 @@ module.exports = ServerController;
     
 
     
+
 
 
 
