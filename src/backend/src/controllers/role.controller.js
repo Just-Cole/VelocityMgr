@@ -83,7 +83,7 @@ class RoleController {
             if (!config.roles[roleName]) {
                 return res.status(404).json({ message: `Role '${roleName}' not found.` });
             }
-            if (roleName === "Admin" || roleName === "Editor" || roleName === "Viewer") {
+            if (["Admin", "Operator", "Moderator", "Viewer"].includes(roleName)) {
                 return res.status(403).json({ message: `Default role '${roleName}' cannot be deleted.` });
             }
     

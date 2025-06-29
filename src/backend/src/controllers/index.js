@@ -1,3 +1,4 @@
+
 // backend/controllers/index.js
 const fs = require('fs');
 const fsPromises = require('fs').promises; // For async file operations
@@ -350,8 +351,27 @@ class IndexController {
                 "Admin": {
                     permissions: [...availablePermissions]
                 },
-                "Editor": {
-                    permissions: ["view_server_stats", "view_logs", "edit_configs", "start_stop_servers", "create_servers", "manage_backups", "send_console_commands", "delete_server", "install_plugins"]
+                "Operator": {
+                    permissions: [
+                        "view_server_stats", 
+                        "view_logs", 
+                        "edit_configs", 
+                        "start_stop_servers", 
+                        "create_servers",
+                        "manage_backups",
+                        "send_console_commands",
+                        "delete_server",
+                        "install_plugins",
+                        "manage_recovery"
+                    ]
+                },
+                "Moderator": {
+                    permissions: [
+                        "view_server_stats",
+                        "view_logs",
+                        "start_stop_servers",
+                        "send_console_commands"
+                    ]
                 },
                 "Viewer": {
                     permissions: ["view_server_stats", "view_logs"]

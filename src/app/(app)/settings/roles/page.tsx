@@ -32,6 +32,8 @@ interface Role {
   permissions: string[];
 }
 
+const SYSTEM_ROLES = ["Admin", "Operator", "Moderator", "Viewer"];
+
 export default function RoleManagementPage() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -161,7 +163,7 @@ export default function RoleManagementPage() {
                       <AccordionTrigger className="hover:no-underline">
                         <div className="flex items-center gap-4">
                             <span className="font-semibold text-lg">{role.name}</span>
-                            {role.name === 'Admin' && <Badge>System</Badge>}
+                            {SYSTEM_ROLES.includes(role.name) && <Badge>System</Badge>}
                         </div>
                       </AccordionTrigger>
                       <AccordionContent className="p-4 bg-muted/50 rounded-md">
@@ -170,7 +172,7 @@ export default function RoleManagementPage() {
                           {role.permissions.map(p => <span key={p}>{p}</span>)}
                         </div>
                         <div className="flex justify-end gap-2 mt-4">
-                           {role.name !== 'Admin' && (
+                           {!SYSTEM_ROLES.includes(role.name) && (
                              <>
                                <Button variant="outline" size="sm" onClick={() => handleEditClick(role)}><Pencil className="mr-2 h-4 w-4"/>Edit</Button>
                                <Button variant="destructive" size="sm" onClick={() => setRoleToDelete(role)}><Trash2 className="mr-2 h-4 w-4"/>Delete</Button>
