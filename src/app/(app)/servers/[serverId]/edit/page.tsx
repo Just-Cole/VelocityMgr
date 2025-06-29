@@ -179,7 +179,7 @@ export default function EditServerPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const canEdit = user?.permissions?.includes('edit_configs');
-  const canManagePlugins = user?.permissions?.includes('manage_plugins');
+  const canManagePlugins = user?.permissions?.includes('manage_plugins') || user?.permissions?.includes('install_plugins');
 
   const [server, setServer] = React.useState<GameServer | null>(null);
   const [template, setTemplate] = React.useState<ServerTemplate | null>(null);

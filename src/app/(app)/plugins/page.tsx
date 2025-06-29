@@ -20,7 +20,7 @@ import { useAuth } from "@/contexts/AuthContext";
 export default function PluginBrowserPage() {
     const { toast } = useToast();
     const { user } = useAuth();
-    const canInstall = user?.permissions?.includes("manage_plugins");
+    const canInstall = user?.permissions?.includes("manage_plugins") || user?.permissions?.includes("install_plugins");
     const [searchQuery, setSearchQuery] = React.useState("");
     const [searchResults, setSearchResults] = React.useState<SpigetPlugin[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
