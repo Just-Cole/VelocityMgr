@@ -204,7 +204,8 @@ class ServerController {
 
             if (!parsedToml.try) parsedToml.try = [];
             if (!parsedToml.try.includes(serverEntryName)) {
-                parsedToml.try.push(serverEntryName);
+                // Add the new server to the beginning of the try list to make it the default
+                parsedToml.try.unshift(serverEntryName);
             }
             
             if (!parsedToml['forced-hosts']) parsedToml['forced-hosts'] = {};

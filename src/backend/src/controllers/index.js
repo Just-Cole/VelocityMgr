@@ -680,7 +680,10 @@ class IndexController {
                         tomlConfig['forced-hosts'][forcedHostKey] = [serverEntryName];
                         
                         if (!tomlConfig.try) tomlConfig.try = [];
-                        if (tomlConfig.try.length === 0) tomlConfig.try.push(serverEntryName);
+                        if (!tomlConfig.try.includes(serverEntryName)) {
+                            // Add the new server to the beginning of the try list
+                            tomlConfig.try.unshift(serverEntryName);
+                        }
             
                         await fsPromises.writeFile(tomlPath, TOML.stringify(tomlConfig), 'utf8');
                         console.log(`[Modrinth Create] Successfully added new modpack server '${newServer.name}' to proxy '${proxyServer.name}' config.`);
