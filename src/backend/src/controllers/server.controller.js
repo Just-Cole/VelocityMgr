@@ -100,6 +100,8 @@ enable-player-address-logging = true
 # represents the IP address of the server to connect to.
 # This is a sample entry. The system will automatically add new servers here.
 Hub = "127.0.0.1:25566"
+
+# A list of server names to try connecting to in order, when a player first joins.
 try = ["Hub"]
 
 [forced-hosts]
@@ -1374,6 +1376,7 @@ module.exports = ServerController;
     
 
     
+
 
 
 
