@@ -201,6 +201,61 @@ class ServerController {
         console.log("ServerController instantiated.");
     }
 
+    async _runOnceToGenerateFiles(server) {
+        return new Promise((resolve, reject) => {
+            const { spawn } = require('child_process');
+            const serverFolderPath = this.indexController._getServerFolderPath(server);
+            const javaArgs = [
+                `-Xms128M`,
+                `-Xmx256M`,
+                '-jar',
+                server.jarFileName,
+            ];
+            
+            console.log(`[File Gen] Spawning ${server.name} to generate initial files...`);
+            const genProcess = spawn(this.indexController.config.java_executable_path || 'java', javaArgs, {
+                cwd: serverFolderPath,
+                stdio: ['pipe', 'pipe', 'pipe']
+            });
+    
+            let output = '';
+            const onData = (data) => {
+                output += data.toString();
+                // We could look for a specific log line, but a timeout is simpler and sufficient.
+            };
+            genProcess.stdout.on('data', onData);
+            genProcess.stderr.on('data', onData);
+            
+            const timeout = setTimeout(() => {
+                console.log(`[File Gen] Timeout reached for ${server.name}. Sending stop command.`);
+                try {
+                    if (genProcess.stdin && !genProcess.stdin.destroyed) {
+                        genProcess.stdin.write('stop\n');
+                    } else {
+                         genProcess.kill('SIGTERM');
+                    }
+                } catch (e) {
+                    console.error(`[File Gen] Error stopping process: ${e.message}`);
+                    genProcess.kill('SIGKILL');
+                }
+            }, 7000); // 7 seconds, give it a bit of time.
+    
+            genProcess.on('exit', (code) => {
+                console.log(`[File Gen] File generation process for ${server.name} exited with code ${code}.`);
+                clearTimeout(timeout);
+                // Even if it exits with an error (like port in use), files might have been created.
+                resolve();
+            });
+            
+            genProcess.on('error', (err) => {
+                console.error(`[File Gen] Failed to spawn process for ${server.name}:`, err);
+                clearTimeout(timeout);
+                // Don't reject, just resolve. The fallback will handle it.
+                resolve();
+            });
+        });
+    }
+
     listServers(req, res, next) {
         try {
             res.status(200).json(this.indexController._readServers());
@@ -337,8 +392,13 @@ class ServerController {
                         .replace(/bind\s*=\s*".*?"/, `bind = "0.0.0.0:${newServer.port}"`)
                         .replace(/port\s*=\s*\d+/, `port = ${newServer.port}`);
                     await fsPromises.writeFile(tomlPath, finalTomlContent.trim(), 'utf-8');
+
+                    // Run the server once to generate the forwarding.secret file
+                    await this._runOnceToGenerateFiles(newServer);
+
                     const secretFilePath = path.join(serverFolderPath, 'forwarding.secret');
                     if (!fs.existsSync(secretFilePath)) {
+                        console.warn(`[File Gen] Velocity did not generate forwarding.secret. Creating one manually as a fallback.`);
                         await fsPromises.writeFile(secretFilePath, crypto.randomBytes(12).toString('hex'), 'utf-8');
                     }
                 }
@@ -1320,6 +1380,7 @@ module.exports = ServerController;
     
 
     
+
 
 
 
