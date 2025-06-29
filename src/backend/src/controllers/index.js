@@ -1,3 +1,4 @@
+
 // backend/controllers/index.js
 const fs = require('fs');
 const fsPromises = require('fs').promises; // For async file operations
@@ -727,16 +728,19 @@ class IndexController {
                 recursive: true
             });
 
-            const defaultConfig = `
-proxies:
-  bungee-cord:
-    online-mode: true
-  proxy-protocol: false
-  velocity:
-    enabled: false
-    online-mode: true
-    secret: ''
-`.trim();
+            // Using the exact template provided by the user, constructed line-by-line for clarity.
+            const defaultConfigLines = [
+                'proxies:',
+                '  bungee-cord:',
+                '    online-mode: true',
+                '  proxy-protocol: false',
+                '  velocity:',
+                '    enabled: false',
+                '    online-mode: true',
+                "    secret: ''"
+            ];
+            const defaultConfig = defaultConfigLines.join('\n');
+
 
             await fsPromises.writeFile(paperGlobalYmlPath, defaultConfig, 'utf-8');
             console.log(`[Secret Sync] Successfully wrote specified paper-global.yml for ${paperServer.name}.`);
@@ -788,3 +792,4 @@ try {
 }
 
 module.exports = IndexController;
+
