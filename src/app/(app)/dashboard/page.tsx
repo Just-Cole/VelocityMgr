@@ -58,8 +58,8 @@ export default function DashboardPage() {
   const { user } = useAuth();
   
   const canCreate = user?.permissions?.includes('create_servers');
-  const canControl = user?.permissions?.includes('start_stop_servers');
-  const canDelete = user?.permissions?.includes('delete_server');
+  const canControl = user?.permissions?.includes('control_servers');
+  const canDelete = user?.permissions?.includes('delete_servers');
 
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
   const [serverToDelete, setServerToDelete] = React.useState<GameServer | null>(null);

@@ -1,4 +1,5 @@
 
+
 // backend/controllers/index.js
 const fs = require('fs');
 const fsPromises = require('fs').promises; // For async file operations
@@ -344,7 +345,7 @@ class IndexController {
         } catch (error) {
             needsRewrite = true;
         }
-        const availablePermissions = ["view_server_stats", "view_logs", "edit_configs", "start_stop_servers", "create_servers", "create_users", "assign_roles", "manage_roles", "manage_recovery", "manage_backups", "send_console_commands", "delete_server", "install_plugins"];
+        const availablePermissions = ["view_server_stats", "view_logs", "edit_configs", "control_servers", "create_servers", "create_users", "assign_roles", "manage_roles", "manage_recovery", "manage_backups", "send_console_commands", "delete_servers", "manage_plugins"];
         configData.availablePermissions = availablePermissions;
         if (!configData.roles) {
             configData.roles = {
@@ -356,12 +357,12 @@ class IndexController {
                         "view_server_stats", 
                         "view_logs", 
                         "edit_configs", 
-                        "start_stop_servers", 
+                        "control_servers", 
                         "create_servers",
                         "manage_backups",
                         "send_console_commands",
-                        "delete_server",
-                        "install_plugins",
+                        "delete_servers",
+                        "manage_plugins",
                         "manage_recovery"
                     ]
                 },
@@ -369,7 +370,7 @@ class IndexController {
                     permissions: [
                         "view_server_stats",
                         "view_logs",
-                        "start_stop_servers",
+                        "control_servers",
                         "send_console_commands"
                     ]
                 },

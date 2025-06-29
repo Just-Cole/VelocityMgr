@@ -76,7 +76,7 @@ export default function ManageServerPage() {
   const hasPermission = (p: string) => user?.permissions?.includes(p) ?? false;
   const canViewLogs = hasPermission('view_logs');
   const canSendCommands = hasPermission('send_console_commands');
-  const canControlServer = hasPermission('start_stop_servers');
+  const canControlServer = hasPermission('control_servers');
   const canEditConfig = hasPermission('edit_configs');
 
   const [server, setServer] = React.useState<GameServer | null>(null); 

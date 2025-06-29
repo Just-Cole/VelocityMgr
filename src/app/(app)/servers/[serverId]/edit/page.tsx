@@ -179,6 +179,7 @@ export default function EditServerPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const canEdit = user?.permissions?.includes('edit_configs');
+  const canManagePlugins = user?.permissions?.includes('manage_plugins');
 
   const [server, setServer] = React.useState<GameServer | null>(null);
   const [template, setTemplate] = React.useState<ServerTemplate | null>(null);
@@ -818,7 +819,7 @@ export default function EditServerPage() {
   }, [serverId, toast]);
 
   const handleTogglePlugin = async (plugin: ServerPlugin) => {
-      if (!canEdit) return;
+      if (!canManagePlugins) return;
       setPluginActionStates(prev => ({ ...prev, [plugin.fileName]: true }));
       try {
           const response = await fetch(`/api/minecraft/servers/${serverId}/plugins/toggle`, {
@@ -842,7 +843,7 @@ export default function EditServerPage() {
   };
 
   const handleUninstallPlugin = async () => {
-      if (!pluginToUninstall || !canEdit) return;
+      if (!pluginToUninstall || !canManagePlugins) return;
       setIsUninstalling(true);
       try {
           const response = await fetch(`/api/minecraft/servers/${serverId}/plugins/uninstall`, {
@@ -868,7 +869,7 @@ export default function EditServerPage() {
     'World': ['level-name', 'level-seed', 'generate-structures', 'level-type', 'max-world-size', 'view-distance', 'simulation-distance', 'allow-nether'],
     'Players': ['max-players', 'allow-flight', 'pvp', 'online-mode', 'white-list', 'enforce-whitelist', 'spawn-protection', 'max-tick-time'],
     'Network': ['server-port', 'network-compression-threshold', 'use-native-transport'],
-    'Advanced': ['enable-rcon', 'rcon.port', 'rcon.password', 'enable-command-block', 'enable-query', 'query.port', 'function-permission-level', 'op-permission-level', 'sync-chunk-writes'],
+    'Advanced': ['enable-rcon', 'rcon.port', 'rcon.password', 'enable-query', 'query.port', 'function-permission-level', 'op-permission-level', 'sync-chunk-writes'],
   };
   const allCategorizedProperties = new Set(Object.values(propertyCategories).flat());
   const booleanProperties = new Set(['allow-flight', 'allow-nether', 'enforce-whitelist', 'force-gamemode', 'generate-structures', 'online-mode', 'pvp', 'white-list', 'enable-rcon', 'enable-command-block', 'enable-query', 'sync-chunk-writes', 'use-native-transport']);
@@ -1461,7 +1462,7 @@ export default function EditServerPage() {
                           Enable, disable, or uninstall plugins for this server.
                       </CardDescription>
                   </div>
-                  {canEdit && (
+                  {canManagePlugins && (
                     <Link href="/plugins" passHref>
                       <Button size="sm">
                           <PlusCircle className="mr-2 h-4 w-4" /> Browse & Install Plugins
@@ -1490,7 +1491,7 @@ export default function EditServerPage() {
                                   <TableHead>Plugin Name</TableHead>
                                   <TableHead className="hidden md:table-cell">Version</TableHead>
                                   <TableHead>Status</TableHead>
-                                  {canEdit && <TableHead className="text-right">Actions</TableHead>}
+                                  {canManagePlugins && <TableHead className="text-right">Actions</TableHead>}
                               </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1506,14 +1507,14 @@ export default function EditServerPage() {
                                                   <Switch
                                                       checked={plugin.isEnabled}
                                                       onCheckedChange={() => handleTogglePlugin(plugin)}
-                                                      disabled={!canEdit || pluginActionStates[plugin.fileName]}
+                                                      disabled={!canManagePlugins || pluginActionStates[plugin.fileName]}
                                                       aria-label={`Toggle ${plugin.name}`}
                                                   />
                                                   <span className="text-xs text-muted-foreground">{plugin.isEnabled ? "Enabled" : "Disabled"}</span>
                                               </div>
                                           )}
                                       </TableCell>
-                                      {canEdit && (
+                                      {canManagePlugins && (
                                           <TableCell className="text-right">
                                               <Button
                                                   variant="ghost"

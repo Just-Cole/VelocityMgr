@@ -15,9 +15,12 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Search, Download, Star, Eye, AlertTriangle, Wand2, ChevronLeft, ChevronRight, Server } from "lucide-react";
 import type { SpigetPlugin, SpigetPluginVersion, GameServer, SpigetSearchResult } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function PluginBrowserPage() {
     const { toast } = useToast();
+    const { user } = useAuth();
+    const canInstall = user?.permissions?.includes("manage_plugins");
     const [searchQuery, setSearchQuery] = React.useState("");
     const [searchResults, setSearchResults] = React.useState<SpigetPlugin[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
@@ -127,7 +130,7 @@ export default function PluginBrowserPage() {
     };
     
     const handleInstall = async () => {
-        if (!installTarget.serverId || !installTarget.versionId || !selectedPlugin) return;
+        if (!installTarget.serverId || !installTarget.versionId || !selectedPlugin || !canInstall) return;
         setIsInstalling(true);
         
         const payload = {
@@ -205,9 +208,11 @@ export default function PluginBrowserPage() {
                                       <span className="flex items-center gap-1"><Download className="h-4 w-4" /> {plugin.downloads.toLocaleString()}</span>
                                       <span className="flex items-center gap-1"><Server className="h-4 w-4" /> {plugin.testedVersions.join(', ')}</span>
                                   </div>
-                                  <Button size="sm" onClick={() => handleOpenInstallDialog(plugin)} className="bg-primary/90 hover:bg-primary">
-                                      <Wand2 className="mr-1.5 h-5 w-5" /> Install
-                                  </Button>
+                                  {canInstall && (
+                                    <Button size="sm" onClick={() => handleOpenInstallDialog(plugin)} className="bg-primary/90 hover:bg-primary">
+                                        <Wand2 className="mr-1.5 h-5 w-5" /> Install
+                                    </Button>
+                                  )}
                               </CardFooter>
                           </Card>
                       ))}
@@ -284,7 +289,7 @@ export default function PluginBrowserPage() {
                   <Button 
                     type="button" 
                     onClick={handleInstall} 
-                    disabled={isInstalling || !installTarget.serverId || !installTarget.versionId}
+                    disabled={isInstalling || !installTarget.serverId || !installTarget.versionId || !canInstall}
                   >
                     {isInstalling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                     Install to Server
@@ -296,4 +301,3 @@ export default function PluginBrowserPage() {
         </div>
     );
 }
-
