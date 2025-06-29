@@ -712,8 +712,8 @@ class IndexController {
 
     async _syncVelocitySecret(paperServer, velocityProxy) {
         console.log(`[Secret Sync] Starting secret sync for ${paperServer.name} with proxy ${velocityProxy.name}.`);
-        const proxyPath = this.indexController._getServerFolderPath(velocityProxy);
-        const paperServerPath = this.indexController._getServerFolderPath(paperServer);
+        const proxyPath = this._getServerFolderPath(velocityProxy);
+        const paperServerPath = this._getServerFolderPath(paperServer);
     
         if (!proxyPath || !paperServerPath) {
             console.error(`[Secret Sync] Could not determine folder path for server or proxy.`);
