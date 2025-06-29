@@ -183,12 +183,10 @@ export default function EditServerPage() {
 
   const [server, setServer] = React.useState<GameServer | null>(null);
   const [template, setTemplate] = React.useState<ServerTemplate | null>(null);
-  const [isLoading, setIsLoading] = React.useState(false); 
-  const [isFetching, setIsFetching] = React.useState(true); 
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [isSubmitting, setIsSubmitting] = React.useState(false); 
   const [apiError, setApiError] = React.useState<string | null>(null);
   
-  const initialDataFetched = React.useRef(false);
-
   // Form states for editable fields
   const [serverName, setServerName] = React.useState("");
   const [serverPort, setServerPort] = React.useState<number | string>("");
@@ -200,7 +198,6 @@ export default function EditServerPage() {
 
   // Backups state
   const [backups, setBackups] = React.useState<Backup[]>([]);
-  const [isLoadingBackups, setIsLoadingBackups] = React.useState(false);
   const [isCreatingBackup, setIsCreatingBackup] = React.useState(false);
   const [backupToRestore, setBackupToRestore] = React.useState<Backup | null>(null);
   const [isRestoringBackup, setIsRestoringBackup] = React.useState(false);
@@ -211,7 +208,6 @@ export default function EditServerPage() {
   const fileUploadRef = React.useRef<HTMLInputElement>(null);
   const [currentFilePath, setCurrentFilePath] = React.useState<string>("/");
   const [fileList, setFileList] = React.useState<DirectoryItem[]>([]);
-  const [isLoadingFiles, setIsLoadingFiles] = React.useState(false);
   const [fileManagerError, setFileManagerError] = React.useState<string | null>(null);
 
   const [showEditFileDialog, setShowEditFileDialog] = React.useState(false);
@@ -234,21 +230,18 @@ export default function EditServerPage() {
   const [isDeletingItem, setIsDeletingItem] = React.useState(false);
 
   // Plugin Manager State
-  const [plugins, setPlugins] = React.useState<ServerPlugin[]>([]);
-  const [isLoadingPlugins, setIsLoadingPlugins] = React.useState(false);
+  const [plugins, setPlugins] = React.useState<ServerPlugin[] | null>(null);
   const [pluginActionStates, setPluginActionStates] = React.useState<{ [key: string]: boolean }>({});
   const [pluginToUninstall, setPluginToUninstall] = React.useState<ServerPlugin | null>(null);
   const [isUninstalling, setIsUninstalling] = React.useState(false);
 
   // Server.properties state
   const [serverProperties, setServerProperties] = React.useState<Record<string, string> | null>(null);
-  const [isLoadingProperties, setIsLoadingProperties] = React.useState(false);
   const [propertiesError, setPropertiesError] = React.useState<string | null>(null);
   const [isSavingProperties, setIsSavingProperties] = React.useState(false);
 
   // Velocity.toml state
   const [velocityToml, setVelocityToml] = React.useState<Record<string, any> | null>(null);
-  const [isLoadingVelocityToml, setIsLoadingVelocityToml] = React.useState(false);
   const [velocityTomlError, setVelocityTomlError] = React.useState<string | null>(null);
   const [isSavingVelocityToml, setIsSavingVelocityToml] = React.useState(false);
   const [serversConfigString, setServersConfigString] = React.useState("");
@@ -269,140 +262,8 @@ export default function EditServerPage() {
     return editableExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
   };
 
-  React.useEffect(() => {
-    if (!serverId) {
-      setIsFetching(false);
-      setApiError("Server ID is missing from the URL.");
-      return;
-    }
-    setIsFetching(true);
-    setApiError(null);
-
-    const fetchServerData = async () => {
-      try {
-        const response = await fetch("/api/minecraft/servers");
-        if (!response.ok) {
-          let errorDetail = `Server responded with status ${response.status}`;
-          try {
-            const errorData = await response.json();
-            errorDetail = errorData.message || errorDetail;
-          } catch (e) {
-            errorDetail = (await response.text()) || errorDetail;
-          }
-          throw new Error(`Failed to fetch server list: ${errorDetail}`);
-        }
-        const allServers: GameServer[] = await response.json();
-        const foundServer = allServers.find(s => s.id === serverId);
-
-        if (foundServer) {
-          setServer(foundServer);
-          setServerName(foundServer.name);
-          setServerPort(foundServer.port || "");
-          setDescription(foundServer.description || "");
-          setMinRam(normalizeRamToOption(foundServer.minRam));
-          setMaxRam(normalizeRamToOption(foundServer.maxRam));
-          setLaunchArgs(foundServer.launchArgs || "");
-          setMaxPlayers(foundServer.maxPlayers || 20);
-          
-          if (foundServer.templateId) {
-            const foundTemplate = MOCK_TEMPLATES.find(t => t.id === foundServer.templateId);
-            setTemplate(foundTemplate || null);
-          }
-        } else {
-          setServer(null);
-          setApiError(`Server with ID "${serverId}" not found in API response.`);
-        }
-      } catch (err) {
-        console.error("Error fetching server data:", err);
-        const errorMessage = err instanceof Error ? err.message : "An unknown error occurred while fetching server data.";
-        setApiError(errorMessage);
-        setServer(null);
-        toast({
-          title: "Error Loading Server",
-          description: errorMessage.substring(0,100),
-          variant: "destructive",
-        });
-      } finally {
-        setIsFetching(false);
-      }
-    };
-
-    fetchServerData();
-  }, [serverId, toast]);
-
-  const fetchConfig = React.useCallback(async () => {
-      if (!server) return;
-
-      if (server.softwareType === 'Velocity') {
-          setIsLoadingVelocityToml(true);
-          setVelocityTomlError(null);
-          try {
-              const response = await fetch(`/api/minecraft/servers/${serverId}/velocity-toml`);
-              if (!response.ok) {
-                   const errorText = await response.text();
-                  throw new Error(JSON.parse(errorText).message || `Failed to load velocity.toml. Status: ${response.status}`);
-              }
-              const data = await response.json();
-              setVelocityToml(data);
-              
-              const serversConfigForEditor = {
-                try: data.try || [],
-                ...(data.servers || {}),
-              };
-              setServersConfigString(TOML.stringify(serversConfigForEditor));
-
-              setForcedHostsTomlString(TOML.stringify(data['forced-hosts'] || {}));
-          } catch (err) {
-              const msg = err instanceof Error ? err.message : 'An unknown error occurred.';
-              setVelocityTomlError(msg);
-              setServersConfigString('# Error loading initial data');
-              setForcedHostsTomlString('# Error loading initial data');
-          } finally {
-              setIsLoadingVelocityToml(false);
-          }
-      } else {
-          setIsLoadingProperties(true);
-          setPropertiesError(null);
-          try {
-              const response = await fetch(`/api/minecraft/servers/${serverId}/server-properties`);
-              if (!response.ok) {
-                  const errorText = await response.text();
-                  throw new Error(JSON.parse(errorText).message || `Failed to load properties. Status: ${response.status}`);
-              }
-              const data = await response.json();
-              setServerProperties(data);
-          } catch (err) {
-              const msg = err instanceof Error ? err.message : 'An unknown error occurred.';
-              setPropertiesError(msg);
-          } finally {
-              setIsLoadingProperties(false);
-          }
-      }
-  }, [server, serverId]);
-  
-  const fetchBackups = React.useCallback(async () => {
-    if (!serverId) return;
-    setIsLoadingBackups(true);
-    try {
-      const response = await fetch(`/api/minecraft/servers/${serverId}/backups`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch backups.');
-      }
-      const backupData: Backup[] = await response.json();
-      setBackups(backupData);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "An unknown error occurred while fetching backups.";
-      toast({ title: "Error Loading Backups", description: msg, variant: "destructive" });
-    } finally {
-      setIsLoadingBackups(false);
-    }
-  }, [serverId, toast]);
-
   const fetchFiles = React.useCallback(async (pathToFetch: string) => {
     if (!serverId) return;
-    setIsLoadingFiles(true);
-    setFileManagerError(null);
     try {
       const response = await fetch(`/api/minecraft/servers/${serverId}/files?path=${encodeURIComponent(pathToFetch)}`);
       if (!response.ok) {
@@ -411,6 +272,7 @@ export default function EditServerPage() {
       }
       const data: DirectoryItem[] = await response.json();
       setFileList(data);
+      setFileManagerError(null);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred while fetching files.";
       setFileManagerError(errorMessage);
@@ -420,39 +282,113 @@ export default function EditServerPage() {
         description: errorMessage,
         variant: "destructive",
       });
-    } finally {
-      setIsLoadingFiles(false);
+    }
+  }, [serverId, toast]);
+
+  const fetchBackups = React.useCallback(async () => {
+    if (!serverId) return;
+    try {
+      const response = await fetch(`/api/minecraft/servers/${serverId}/backups`);
+      if (!response.ok) throw new Error((await response.json()).message || 'Failed to fetch backups.');
+      setBackups(await response.json());
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "An unknown error occurred while fetching backups.";
+      toast({ title: "Error Loading Backups", description: msg, variant: "destructive" });
     }
   }, [serverId, toast]);
 
   const fetchPlugins = React.useCallback(async () => {
     if (!serverId) return;
-    setIsLoadingPlugins(true);
     try {
         const response = await fetch(`/api/minecraft/servers/${serverId}/plugins`);
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Failed to fetch plugins.');
-        }
-        const data: ServerPlugin[] = await response.json();
-        setPlugins(data);
+        if (!response.ok) throw new Error((await response.json()).message || 'Failed to fetch plugins.');
+        setPlugins(await response.json());
     } catch (err) {
         const msg = err instanceof Error ? err.message : "An unknown error occurred while fetching plugins.";
         toast({ title: "Error Loading Plugins", description: msg, variant: "destructive" });
-    } finally {
-        setIsLoadingPlugins(false);
     }
   }, [serverId, toast]);
+  
 
   React.useEffect(() => {
-    if (server && !initialDataFetched.current) {
-      initialDataFetched.current = true;
-      fetchConfig();
-      fetchFiles('/');
-      fetchBackups();
-      fetchPlugins();
+    if (!serverId) {
+      setIsLoading(false);
+      setApiError("Server ID is missing from the URL.");
+      return;
     }
-  }, [server, fetchConfig, fetchFiles, fetchBackups, fetchPlugins]);
+  
+    const fetchAllData = async () => {
+      setIsLoading(true);
+      setApiError(null);
+  
+      try {
+        const serverResponse = await fetch("/api/minecraft/servers");
+        if (!serverResponse.ok) throw new Error(`Failed to fetch server list: ${serverResponse.statusText}`);
+        const allServers: GameServer[] = await serverResponse.json();
+        const foundServer = allServers.find(s => s.id === serverId);
+  
+        if (foundServer) {
+          setServer(foundServer);
+          setServerName(foundServer.name);
+          setServerPort(foundServer.port || "");
+          setDescription(foundServer.description || "");
+          setMinRam(normalizeRamToOption(foundServer.minRam));
+          setMaxRam(normalizeRamToOption(foundServer.maxRam));
+          setLaunchArgs(foundServer.launchArgs || "");
+          setMaxPlayers(foundServer.maxPlayers || 20);
+          if (foundServer.templateId) {
+            setTemplate(MOCK_TEMPLATES.find(t => t.id === foundServer.templateId) || null);
+          }
+  
+          // Fetch data for all tabs now in parallel
+          const [configRes, filesRes, backupsRes, pluginsRes] = await Promise.all([
+            fetch(`/api/minecraft/servers/${foundServer.id}/${foundServer.softwareType === 'Velocity' ? 'velocity-toml' : 'server-properties'}`),
+            fetch(`/api/minecraft/servers/${foundServer.id}/files?path=${encodeURIComponent('/')}`),
+            fetch(`/api/minecraft/servers/${foundServer.id}/backups`),
+            fetch(`/api/minecraft/servers/${foundServer.id}/plugins`),
+          ]);
+  
+          // Process Config
+          if (configRes.ok) {
+            const configData = await configRes.json();
+            if (foundServer.softwareType === 'Velocity') {
+              setVelocityToml(configData);
+              const serversConfigForEditor = { servers: configData.servers || {}, try: configData.try || [] };
+              setServersConfigString(TOML.stringify(serversConfigForEditor));
+              setForcedHostsTomlString(TOML.stringify(configData['forced-hosts'] || {}));
+            } else {
+              setServerProperties(configData);
+            }
+          } else {
+            const errorMsg = `Failed to load config: ${await configRes.text()}`;
+            if (foundServer.softwareType === 'Velocity') setVelocityTomlError(errorMsg); else setPropertiesError(errorMsg);
+          }
+          
+          // Process Files
+          if (filesRes.ok) setFileList(await filesRes.json()); else setFileManagerError(`Failed to load files: ${await filesRes.text()}`);
+  
+          // Process Backups
+          if (backupsRes.ok) setBackups(await backupsRes.json()); else toast({ title: "Backup Error", description: `Failed to load backups: ${await backupsRes.text()}`, variant: "destructive" });
+  
+          // Process Plugins
+          if (pluginsRes.ok) setPlugins(await pluginsRes.json()); else toast({ title: "Plugin Error", description: `Failed to load plugins: ${await pluginsRes.text()}`, variant: "destructive" });
+  
+        } else {
+          setServer(null);
+          setApiError(`Server with ID "${serverId}" not found.`);
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
+        setApiError(errorMessage);
+        setServer(null);
+        toast({ title: "Error Loading Server Data", description: errorMessage, variant: "destructive" });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchAllData();
+  }, [serverId, toast]);
 
   const handlePropertyChange = (key: string, value: string) => {
       setServerProperties(prev => prev ? { ...prev, [key]: value } : { [key]: value });
@@ -528,7 +464,7 @@ export default function EditServerPage() {
       return;
     }
     
-    const { try: tryArray = [], ...serverEntries } = parsedServersConfig || {};
+    const { try: tryArray = [], servers: serverEntries = {} } = parsedServersConfig || {};
 
     const newTomlData = {
         ...velocityToml,
@@ -559,7 +495,7 @@ export default function EditServerPage() {
 
   const handleSaveChanges = async () => {
     if (!server || !canEdit) return;
-    setIsLoading(true);
+    setIsSubmitting(true);
     
     const updatedServerData = {
       name: serverName,
@@ -596,7 +532,7 @@ export default function EditServerPage() {
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -733,7 +669,7 @@ export default function EditServerPage() {
     const formData = new FormData();
     formData.append('file', file);
 
-    setIsLoadingFiles(true); 
+    // No need for separate loading state, main one handles it
     try {
       const response = await fetch(`/api/minecraft/servers/${serverId}/files/upload?destinationPath=${encodeURIComponent(currentFilePath)}`, {
         method: 'POST',
@@ -749,7 +685,6 @@ export default function EditServerPage() {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred during upload.";
       toast({ title: "Upload Failed", description: errorMessage, variant: "destructive" });
     } finally {
-      setIsLoadingFiles(false);
       if(fileUploadRef.current) fileUploadRef.current.value = ""; 
     }
   };
@@ -982,7 +917,7 @@ export default function EditServerPage() {
 
 
 
-  if (isFetching) {
+  if (isLoading) {
     return (
       <div className="container mx-auto py-8 flex justify-center items-center min-h-[calc(100vh-10rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -1033,8 +968,8 @@ export default function EditServerPage() {
             Back to Manage
         </Button>
         {canEdit && (
-          <Button onClick={handleSaveChanges} disabled={isLoading}>
-            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+          <Button onClick={handleSaveChanges} disabled={isSubmitting}>
+            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Save Changes
           </Button>
         )}
@@ -1138,9 +1073,7 @@ export default function EditServerPage() {
                         <CardDescription>Edit the core Velocity configuration. Changes require a restart.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {isLoadingVelocityToml ? (
-                             <div className="flex justify-center items-center py-6"><Loader2 className="h-8 w-8 animate-spin text-primary" /><p className="ml-2">Loading velocity.toml...</p></div>
-                        ) : velocityTomlError ? (
+                        {velocityTomlError ? (
                              <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{velocityTomlError}</AlertDescription></Alert>
                         ) : velocityToml ? (
                             <Accordion type="multiple" defaultValue={['general', 'servers-and-hosts']} className="w-full">
@@ -1177,7 +1110,7 @@ export default function EditServerPage() {
                                     <AccordionTrigger className="text-base font-semibold">Servers & Forced Hosts</AccordionTrigger>
                                     <AccordionContent className="pt-2 space-y-4">
                                         <div>
-                                            <Label htmlFor="toml-servers">Servers</Label>
+                                            <Label htmlFor="toml-servers">Servers & Try Order</Label>
                                             <p className="text-xs text-muted-foreground mb-1">TOML configuration for backend servers and try order. E.g., try = ["hub"]</p>
                                             <Textarea
                                                 id="toml-servers"
@@ -1224,12 +1157,7 @@ export default function EditServerPage() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {isLoadingProperties ? (
-                            <div className="flex justify-center items-center py-6">
-                                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                                <p className="ml-2">Loading properties...</p>
-                            </div>
-                        ) : propertiesError ? (
+                        {propertiesError ? (
                             <Alert variant="destructive">
                                 <AlertTriangle className="h-4 w-4" />
                                 <AlertTitle>Error Loading Properties</AlertTitle>
@@ -1332,12 +1260,7 @@ export default function EditServerPage() {
                   <input type="file" ref={fileUploadRef} onChange={handleFileUpload} className="hidden" />
                 </div>
               )}
-              {isLoadingFiles ? (
-                <div className="flex justify-center items-center py-6">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <p className="ml-2">Loading files...</p>
-                </div>
-              ) : fileManagerError ? (
+              {fileManagerError ? (
                 <Alert variant="destructive">
                   <AlertTriangle className="h-4 w-4" />
                   <AlertTitle>Error Loading Files</AlertTitle>
@@ -1417,12 +1340,7 @@ export default function EditServerPage() {
               {canEdit && <Button size="sm" onClick={handleCreateBackup} disabled={isCreatingBackup}><PlusCircle className="mr-2 h-4 w-4" />Create Backup</Button>}
             </CardHeader>
             <CardContent>
-              {isLoadingBackups ? (
-                 <div className="flex justify-center items-center py-6">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <p className="ml-2">Loading backups...</p>
-                </div>
-              ) : backups.length === 0 ? (
+              {backups.length === 0 ? (
                 <div className="text-center py-8 px-4 border-2 border-dashed rounded-lg">
                   <ListX className="mx-auto h-12 w-12 text-muted-foreground" />
                   <h3 className="mt-4 text-lg font-medium">No Backups Found</h3>
@@ -1490,12 +1408,7 @@ export default function EditServerPage() {
                   )}
               </CardHeader>
               <CardContent>
-                  {isLoadingPlugins ? (
-                      <div className="flex justify-center items-center py-6">
-                          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                          <p className="ml-2">Loading plugins...</p>
-                      </div>
-                  ) : plugins.length === 0 ? (
+                  {!plugins || plugins.length === 0 ? (
                       <div className="text-center py-8 px-4 border-2 border-dashed rounded-lg">
                           <ListX className="mx-auto h-12 w-12 text-muted-foreground" />
                           <h3 className="mt-4 text-lg font-medium">No Plugins Found</h3>
@@ -1629,7 +1542,7 @@ export default function EditServerPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Rename Item</DialogTitle>
-            <DialogDescription>Rename "{itemToRename?.name}" in code>{itemToRename ? (itemToRename.path.substring(0, itemToRename.path.lastIndexOf(itemToRename.name)) || "/") : ""}</code></DialogDescription>
+            <DialogDescription>Rename "{itemToRename?.name}" in <code>{itemToRename ? (itemToRename.path.substring(0, itemToRename.path.lastIndexOf(itemToRename.name)) || "/") : ""}</code></DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2">
             <Label htmlFor="newItemNameInput">New Name</Label>
