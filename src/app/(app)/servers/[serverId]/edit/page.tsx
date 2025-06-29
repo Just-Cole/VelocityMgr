@@ -617,6 +617,7 @@ export default function EditServerPage() {
   const handleItemClick = async (item: DirectoryItem) => {
     if (item.type === 'folder') {
       setCurrentFilePath(item.path);
+      fetchFiles(item.path);
     } else { // File
       if (isTextEditableFile(item.name)) {
         setEditingFile(item);
@@ -676,6 +677,7 @@ export default function EditServerPage() {
     let parentPath = currentFilePath.replace(/\/$/, "").substring(0, currentFilePath.replace(/\/$/, "").lastIndexOf('/')) + "/";
     if (parentPath === "//" || parentPath === "") parentPath = "/";
     setCurrentFilePath(parentPath);
+    fetchFiles(parentPath);
   };
 
   const handleTriggerUpload = () => {
