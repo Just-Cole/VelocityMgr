@@ -60,142 +60,6 @@ const formatServerProperties = (newProps, existingContent = '') => {
     return newLines.filter((line, index) => line.trim() !== '' || index !== newLines.length - 1).join('\n');
 };
 
-const velocityTomlTemplate = `
-# Config version. Do not change this
-config-version = "2.7"
-# What port should the proxy be bound to? By default, we'll bind to all addresses on port 25577.
-bind = "0.0.0.0:25577"
-# What should be the MOTD? This gets displayed when the player adds your server to
-# their server list. Only MiniMessage format is accepted.
-motd = "<#09add3>A Velocity Server"
-# What should we display for the maximum number of players? (Velocity does not support a cap
-# on the number of players online.)
-show-max-players = 500
-# Should we authenticate players with Mojang? By default, this is on.
-online-mode = true
-# Should the proxy enforce the new public key security standard? By default, this is on.
-force-key-authentication = true
-# If client's ISP/AS sent from this proxy is different from the one from Mojang's
-# authentication server, the player is kicked. This disallows some VPN and proxy
-# connections but is a weak form of protection.
-prevent-client-proxy-connections = false
-# Should we announce to Forge clients that this is a Velocity proxy?
-# If you have no Forge servers, this is not necessary.
-announce-forge = false
-# If a player is already connected to the proxy, should we kick them?
-kick-existing-players = false
-# Ping-passthrough behavior.
-# "DISABLED" - Ping is handled by the proxy.
-# "ALL" - Ping is passed to the server containing the most players.
-# "MODS" - Ping is passed to the server containing the most players, but only for servers with a modpack.
-# "SERVER" - Ping is passed to the server that the player would connect to.
-ping-passthrough = "DISABLED"
-# Whether to enable the sample players in the ping response.
-sample-players-in-ping = false
-# If enabled, the proxy will log the IP addresses of players.
-enable-player-address-logging = true
-
-[servers]
-# Configure your servers here. Each key represents the server's name, and the value
-# represents the IP address of the server to connect to.
-# This is a sample entry. The system will automatically add new servers here.
-Hub = "127.0.0.1:25566"
-
-# A list of server names to try connecting to in order, when a player first joins.
-try = ["Hub"]
-
-[forced-hosts]
-# Configure your forced hosts here.
-# "lobby.example.com" = ["Hub"]
-
-[forwarding]
-# Should we forward IP addresses and other data to backend servers?
-# Available options:
-# - "none":        No forwarding will be done. All players will appear to be connecting
-#                  from the proxy and will have offline-mode UUIDs.
-# - "legacy":      Forward player IPs and UUIDs in a BungeeCord-compatible format. Use this
-#                  if you run servers using Minecraft 1.12 or lower.
-# - "bungeeguard": Forward player IPs and UUIDs in a format supported by the BungeeGuard
-#                  plugin. Use this if you run servers using Minecraft 1.12 or lower, and are
-#                  unable to implement network level firewalling (on a shared host).
-# - "modern":      Forward player IPs and UUIDs as part of the login process using
-#                  Velocity's native forwarding. Only applicable for Minecraft 1.13 or higher.
-player-info-forwarding-mode = "modern"
-# If you are using modern or BungeeGuard IP forwarding, configure a file that contains a unique secret here.
-# The file is expected to be UTF-8 encoded and not empty.
-forwarding-secret-file = "forwarding.secret"
-
-[advanced]
-# How large a Minecraft packet has to be before we compress it. Setting this to zero will
-# compress all packets, and setting it to -1 will disable compression entirely.
-compression-threshold = 256
-# How much compression should be done (from 0-9). The default is -1, which uses the
-# default level of 6.
-compression-level = -1
-# How fast (in milliseconds) are clients allowed to connect after the last connection? By
-# default, this is three seconds. Disable this by setting this to 0.
-login-ratelimit = 3000
-# Specify a custom timeout for connection timeouts here. The default is five seconds.
-connection-timeout = 5000
-# Specify a read timeout for connections here. The default is 30 seconds.
-read-timeout = 30000
-# Enables compatibility with HAProxy's PROXY protocol. If you don't know what this is for, then
-# don't enable it.
-haproxy-protocol = false
-# Enables TCP fast open support on the proxy. Requires the proxy to run on Linux.
-tcp-fast-open = false
-# Enables BungeeCord plugin messaging channel support on Velocity.
-bungee-plugin-message-channel = true
-# Shows ping requests to the proxy from clients.
-show-ping-requests = false
-# By default, Velocity will attempt to gracefully handle situations where the user unexpectedly
-# loses connection to the server without an explicit disconnect message by attempting to fall the
-# user back, except in the case of read timeouts. BungeeCord will disconnect the user instead. You
-# can disable this setting to use the BungeeCord behavior.
-failover-on-unexpected-server-disconnect = true
-# Declares the proxy commands to 1.13+ clients.
-announce-proxy-commands = true
-# Enables the logging of commands
-log-command-executions = false
-# Enables logging of player connections when connecting to the proxy, switching servers
-# and disconnecting from the proxy.
-log-player-connections = true
-# Allows players transferred from other hosts via the
-# Transfer packet (Minecraft 1.20.5) to be received.
-accepts-transfers = false
-# Enables support for SO_REUSEPORT. This may help the proxy scale better on multicore systems
-# with a lot of incoming connections, and provide better CPU utilization than the existing
-# strategy of having a single thread accepting connections and distributing them to worker
-# threads. Disabled by default. Requires Linux or macOS.
-enable-reuse-port = false
-# How fast (in milliseconds) are clients allowed to send commands after the last command
-# By default this is 50ms (20 commands per second)
-command-rate-limit = 50
-# Should we forward commands to the backend upon being rate limited?
-# This will forward the command to the server instead of processing it on the proxy.
-# Since most server implementations have a rate limit, this will prevent the player
-# from being able to send excessive commands to the server.
-forward-commands-if-rate-limited = true
-# How many commands are allowed to be sent after the rate limit is hit before the player is kicked?
-# Setting this to 0 or lower will disable this feature.
-kick-after-rate-limited-commands = 0
-# How fast (in milliseconds) are clients allowed to send tab completions after the last tab completion
-tab-complete-rate-limit = 10
-# How many tab completions are allowed to be sent after the rate limit is hit before the player is kicked?
-# Setting this to 0 or lower will disable this feature.
-kick-after-rate-limited-tab-completes = 0
-
-[query]
-# If you wish to enable responding to GameSpy 4 query requests, set enabled to true.
-enabled = false
-# If query is enabled, on what port should the query protocol listen on?
-port = 25577
-# This is the name of the map that is reported to the query services.
-map = "Velocity"
-# Whether to show plugins in the query response.
-show-plugins = false
-`;
-
 
 class ServerController {
     constructor(indexControllerInstance) {
@@ -388,15 +252,26 @@ class ServerController {
                 const newContent = formatServerProperties(props, existingContent);
                 await fsPromises.writeFile(serverPropsPath, newContent, 'utf-8');
             } else { // Velocity
-                const tomlPath = path.join(serverFolderPath, 'velocity.toml');
-                if (!fs.existsSync(tomlPath)) {
-                    const finalTomlContent = velocityTomlTemplate
-                        .replace(/bind\s*=\s*".*?"/, `bind = "0.0.0.0:${newServer.port}"`)
-                        .replace(/port\s*=\s*\d+/, `port = ${newServer.port}`);
-                    await fsPromises.writeFile(tomlPath, finalTomlContent.trim(), 'utf-8');
+                // Run the server once to generate default files, including velocity.toml and forwarding.secret
+                await this._runOnceToGenerateFiles(newServer);
 
-                    // Run the server once to generate the forwarding.secret file
-                    await this._runOnceToGenerateFiles(newServer);
+                // Now that velocity.toml is generated by Velocity, update the port
+                const tomlPath = path.join(serverFolderPath, 'velocity.toml');
+                if (fs.existsSync(tomlPath)) {
+                    try {
+                        const tomlContent = await fsPromises.readFile(tomlPath, 'utf-8');
+                        const parsedToml = TOML.parse(tomlContent);
+                        parsedToml.bind = `0.0.0.0:${newServer.port}`;
+                        // Also update query port to match if it exists
+                        if (parsedToml.query) {
+                            parsedToml.query.port = newServer.port;
+                        }
+                        await fsPromises.writeFile(tomlPath, TOML.stringify(parsedToml), 'utf-8');
+                        console.log(`[Post-Gen] Updated generated velocity.toml with port ${newServer.port}.`);
+                    } catch (e) {
+                        console.error(`[Post-Gen] Failed to read/update generated velocity.toml for port:`, e);
+                        // Don't fail the entire process, but log the error.
+                    }
                 }
             }
     
@@ -1376,6 +1251,7 @@ module.exports = ServerController;
     
 
     
+
 
 
 
