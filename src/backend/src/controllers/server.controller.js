@@ -79,6 +79,30 @@ force-key-authentication = true
 # authentication server, the player is kicked. This disallows some VPN and proxy
 # connections but is a weak form of protection.
 prevent-client-proxy-connections = false
+# Should we announce to Forge clients that this is a Velocity proxy?
+# If you have no Forge servers, this is not necessary.
+announce-forge = false
+# If a player is already connected to the proxy, should we kick them?
+kick-existing-players = false
+# Ping-passthrough behavior.
+# "DISABLED" - Ping is handled by the proxy.
+# "ALL" - Ping is passed to the server containing the most players.
+# "MODS" - Ping is passed to the server containing the most players, but only for servers with a modpack.
+# "SERVER" - Ping is passed to the server that the player would connect to.
+ping-passthrough = "DISABLED"
+# Whether to enable the sample players in the ping response.
+sample-players-in-ping = false
+# If enabled, the proxy will log the IP addresses of players.
+enable-player-address-logging = true
+
+[servers]
+# Configure your servers here. Each key represents the server's name, and the value
+# represents the IP address of the server to connect to.
+try = []
+
+[forced-hosts]
+# Configure your forced hosts here.
+# "lobby.example.com" = ["lobby"]
 
 [forwarding]
 # Should we forward IP addresses and other data to backend servers?
@@ -96,15 +120,6 @@ player-info-forwarding-mode = "modern"
 # If you are using modern or BungeeGuard IP forwarding, configure a file that contains a unique secret here.
 # The file is expected to be UTF-8 encoded and not empty.
 forwarding-secret-file = "forwarding.secret"
-
-[servers]
-# Configure your servers here. Each key represents the server's name, and the value
-# represents the IP address of the server to connect to.
-try = []
-
-[forced-hosts]
-# Configure your forced hosts here.
-# "lobby.example.com" = ["lobby"]
 
 [advanced]
 # How large a Minecraft packet has to be before we compress it. Setting this to zero will
@@ -165,6 +180,16 @@ tab-complete-rate-limit = 10
 # How many tab completions are allowed to be sent after the rate limit is hit before the player is kicked?
 # Setting this to 0 or lower will disable this feature.
 kick-after-rate-limited-tab-completes = 0
+
+[query]
+# If you wish to enable responding to GameSpy 4 query requests, set enabled to true.
+enabled = false
+# If query is enabled, on what port should the query protocol listen on?
+port = 25577
+# This is the name of the map that is reported to the query services.
+map = "Velocity"
+# Whether to show plugins in the query response.
+show-plugins = false
 `;
 
 
@@ -306,7 +331,9 @@ class ServerController {
             } else { // Velocity
                 const tomlPath = path.join(serverFolderPath, 'velocity.toml');
                 if (!fs.existsSync(tomlPath)) {
-                    const finalTomlContent = velocityTomlTemplate.replace(/bind\s*=\s*"0\.0\.0\.0:25565"/, `bind = "0.0.0.0:${newServer.port}"`);
+                    const finalTomlContent = velocityTomlTemplate
+                        .replace(/bind\s*=\s*".*?"/, `bind = "0.0.0.0:${newServer.port}"`)
+                        .replace(/port\s*=\s*\d+/, `port = ${newServer.port}`);
                     await fsPromises.writeFile(tomlPath, finalTomlContent.trim(), 'utf-8');
                     const secretFilePath = path.join(serverFolderPath, 'forwarding.secret');
                     if (!fs.existsSync(secretFilePath)) {
@@ -1291,4 +1318,5 @@ module.exports = ServerController;
     
 
     
+
 
