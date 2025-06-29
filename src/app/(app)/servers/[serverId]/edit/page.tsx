@@ -249,7 +249,7 @@ export default function EditServerPage() {
   const [isLoadingVelocityToml, setIsLoadingVelocityToml] = React.useState(false);
   const [velocityTomlError, setVelocityTomlError] = React.useState<string | null>(null);
   const [isSavingVelocityToml, setIsSavingVelocityToml] = React.useState(false);
-  const [serversTomlString, setServersTomlString] = React.useState("");
+  const [serversConfigString, setServersConfigString] = React.useState("");
   const [forcedHostsTomlString, setForcedHostsTomlString] = React.useState("");
   const [tomlParseError, setTomlParseError] = React.useState<{servers?: string; 'forced-hosts'?: string}>({});
 
@@ -342,12 +342,18 @@ export default function EditServerPage() {
               }
               const data = await response.json();
               setVelocityToml(data);
-              setServersTomlString(TOML.stringify(data.servers || {}));
+              
+              const serversConfigForEditor = {
+                try: data.try || [],
+                ...(data.servers || {}),
+              };
+              setServersConfigString(TOML.stringify(serversConfigForEditor));
+
               setForcedHostsTomlString(TOML.stringify(data['forced-hosts'] || {}));
           } catch (err) {
               const msg = err instanceof Error ? err.message : 'An unknown error occurred.';
               setVelocityTomlError(msg);
-              setServersTomlString('# Error loading initial data');
+              setServersConfigString('# Error loading initial data');
               setForcedHostsTomlString('# Error loading initial data');
           } finally {
               setIsLoadingVelocityToml(false);
@@ -413,12 +419,12 @@ export default function EditServerPage() {
   const handleSaveVelocityToml = async () => {
     if (!velocityToml || !canEdit) return;
 
-    let parsedServers, parsedForcedHosts;
+    let parsedServersConfig, parsedForcedHosts;
     let hasError = false;
     const newErrors: typeof tomlParseError = {};
 
     try {
-        parsedServers = TOML.parse(serversTomlString);
+        parsedServersConfig = TOML.parse(serversConfigString);
         newErrors.servers = undefined;
     } catch (err) {
         const msg = err instanceof Error ? err.message.split('\n')[0] : "Invalid TOML format";
@@ -445,12 +451,16 @@ export default function EditServerPage() {
       });
       return;
     }
+    
+    const { try: tryArray, ...serverEntries } = parsedServersConfig || { try: [] };
 
     const newTomlData = {
         ...velocityToml,
-        servers: parsedServers,
+        servers: serverEntries,
+        try: tryArray || [],
         'forced-hosts': parsedForcedHosts,
     };
+
 
     setIsSavingVelocityToml(true);
     try {
@@ -1155,19 +1165,14 @@ export default function EditServerPage() {
                                     <AccordionTrigger className="text-base font-semibold">Servers & Forced Hosts</AccordionTrigger>
                                     <AccordionContent className="pt-2 space-y-4">
                                         <div>
-                                            <Label htmlFor="toml-try">Server Try Order</Label>
-                                            <p className="text-xs text-muted-foreground mb-1">Comma-separated list of server names to try connecting to first.</p>
-                                            <Input id="toml-try" value={(velocityToml.try || []).join(', ')} onChange={(e) => handleTomlChange('try', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} disabled={!canEdit} />
-                                        </div>
-                                         <div>
                                             <Label htmlFor="toml-servers">Servers</Label>
-                                            <p className="text-xs text-muted-foreground mb-1">TOML configuration for backend servers. E.g., hub = "127.0.0.1:25566"</p>
+                                            <p className="text-xs text-muted-foreground mb-1">TOML configuration for backend servers and try order. E.g., try = ["hub"]</p>
                                             <Textarea
                                                 id="toml-servers"
-                                                value={serversTomlString}
-                                                onChange={(e) => setServersTomlString(e.target.value)}
+                                                value={serversConfigString}
+                                                onChange={(e) => setServersConfigString(e.target.value)}
                                                 disabled={!canEdit}
-                                                rows={4}
+                                                rows={6}
                                                 className={cn("font-code", tomlParseError.servers && "border-destructive focus-visible:ring-destructive")}
                                             />
                                             {tomlParseError.servers && <p className="text-sm text-destructive mt-1">{tomlParseError.servers}</p>}
@@ -1728,4 +1733,6 @@ export default function EditServerPage() {
     </div>
   );
 }
+    
+
     
