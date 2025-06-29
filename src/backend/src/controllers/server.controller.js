@@ -395,12 +395,6 @@ class ServerController {
 
                     // Run the server once to generate the forwarding.secret file
                     await this._runOnceToGenerateFiles(newServer);
-
-                    const secretFilePath = path.join(serverFolderPath, 'forwarding.secret');
-                    if (!fs.existsSync(secretFilePath)) {
-                        console.warn(`[File Gen] Velocity did not generate forwarding.secret. Creating one manually as a fallback.`);
-                        await fsPromises.writeFile(secretFilePath, crypto.randomBytes(12).toString('hex'), 'utf-8');
-                    }
                 }
             }
     
@@ -1380,6 +1374,7 @@ module.exports = ServerController;
     
 
     
+
 
 
 

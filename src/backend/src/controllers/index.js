@@ -727,11 +727,15 @@ class IndexController {
             if (fs.existsSync(secretFilePath)) {
                 secret = await fsPromises.readFile(secretFilePath, 'utf-8');
             } else {
-                secret = crypto.randomBytes(12).toString('hex'); // Generate a new secret
-                await fsPromises.writeFile(secretFilePath, secret, 'utf-8');
-                console.log(`[Secret Sync] Generated new forwarding.secret for proxy ${velocityProxy.name}.`);
+                console.warn(`[Secret Sync] forwarding.secret not found for proxy ${velocityProxy.name}. Cannot sync secret to ${paperServer.name}. Please start the proxy once to generate it.`);
+                return;
             }
             secret = secret.trim();
+
+            if (!secret) {
+                console.warn(`[Secret Sync] forwarding.secret for proxy ${velocityProxy.name} is empty. Cannot sync secret to ${paperServer.name}.`);
+                return;
+            }
     
             const paperConfigDir = path.join(paperServerPath, 'config');
             const paperGlobalYmlPath = path.join(paperConfigDir, 'paper-global.yml');
