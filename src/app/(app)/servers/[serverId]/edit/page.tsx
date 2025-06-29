@@ -186,6 +186,8 @@ export default function EditServerPage() {
   const [isLoading, setIsLoading] = React.useState(false); 
   const [isFetching, setIsFetching] = React.useState(true); 
   const [apiError, setApiError] = React.useState<string | null>(null);
+  
+  const initialDataFetched = React.useRef(false);
 
   // Form states for editable fields
   const [serverName, setServerName] = React.useState("");
@@ -377,6 +379,80 @@ export default function EditServerPage() {
           }
       }
   }, [server, serverId]);
+  
+  const fetchBackups = React.useCallback(async () => {
+    if (!serverId) return;
+    setIsLoadingBackups(true);
+    try {
+      const response = await fetch(`/api/minecraft/servers/${serverId}/backups`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch backups.');
+      }
+      const backupData: Backup[] = await response.json();
+      setBackups(backupData);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "An unknown error occurred while fetching backups.";
+      toast({ title: "Error Loading Backups", description: msg, variant: "destructive" });
+    } finally {
+      setIsLoadingBackups(false);
+    }
+  }, [serverId, toast]);
+
+  const fetchFiles = React.useCallback(async (pathToFetch: string) => {
+    if (!serverId) return;
+    setIsLoadingFiles(true);
+    setFileManagerError(null);
+    try {
+      const response = await fetch(`/api/minecraft/servers/${serverId}/files?path=${encodeURIComponent(pathToFetch)}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Failed to list files. Status: ${response.status}`);
+      }
+      const data: DirectoryItem[] = await response.json();
+      setFileList(data);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred while fetching files.";
+      setFileManagerError(errorMessage);
+      setFileList([]);
+      toast({
+        title: "Error Loading Files",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingFiles(false);
+    }
+  }, [serverId, toast]);
+
+  const fetchPlugins = React.useCallback(async () => {
+    if (!serverId) return;
+    setIsLoadingPlugins(true);
+    try {
+        const response = await fetch(`/api/minecraft/servers/${serverId}/plugins`);
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to fetch plugins.');
+        }
+        const data: ServerPlugin[] = await response.json();
+        setPlugins(data);
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : "An unknown error occurred while fetching plugins.";
+        toast({ title: "Error Loading Plugins", description: msg, variant: "destructive" });
+    } finally {
+        setIsLoadingPlugins(false);
+    }
+  }, [serverId, toast]);
+
+  React.useEffect(() => {
+    if (server && !initialDataFetched.current) {
+      initialDataFetched.current = true;
+      fetchConfig();
+      fetchFiles('/');
+      fetchBackups();
+      fetchPlugins();
+    }
+  }, [server, fetchConfig, fetchFiles, fetchBackups, fetchPlugins]);
 
   const handlePropertyChange = (key: string, value: string) => {
       setServerProperties(prev => prev ? { ...prev, [key]: value } : { [key]: value });
@@ -481,32 +557,6 @@ export default function EditServerPage() {
     }
   };
 
-  const fetchFiles = React.useCallback(async (pathToFetch: string) => {
-    if (!serverId) return;
-    setIsLoadingFiles(true);
-    setFileManagerError(null);
-    try {
-      const response = await fetch(`/api/minecraft/servers/${serverId}/files?path=${encodeURIComponent(pathToFetch)}`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Failed to list files. Status: ${response.status}`);
-      }
-      const data: DirectoryItem[] = await response.json();
-      setFileList(data);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred while fetching files.";
-      setFileManagerError(errorMessage);
-      setFileList([]);
-      toast({
-        title: "Error Loading Files",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingFiles(false);
-    }
-  }, [serverId, toast]);
-
   const handleSaveChanges = async () => {
     if (!server || !canEdit) return;
     setIsLoading(true);
@@ -549,25 +599,6 @@ export default function EditServerPage() {
       setIsLoading(false);
     }
   };
-  
-  const fetchBackups = React.useCallback(async () => {
-    if (!serverId) return;
-    setIsLoadingBackups(true);
-    try {
-      const response = await fetch(`/api/minecraft/servers/${serverId}/backups`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch backups.');
-      }
-      const backupData: Backup[] = await response.json();
-      setBackups(backupData);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "An unknown error occurred while fetching backups.";
-      toast({ title: "Error Loading Backups", description: msg, variant: "destructive" });
-    } finally {
-      setIsLoadingBackups(false);
-    }
-  }, [serverId, toast]);
 
   const handleCreateBackup = async () => {
     if (!canEdit || isCreatingBackup || !serverId) return;
@@ -811,25 +842,6 @@ export default function EditServerPage() {
     }
   };
 
-  const fetchPlugins = React.useCallback(async () => {
-    if (!serverId) return;
-    setIsLoadingPlugins(true);
-    try {
-        const response = await fetch(`/api/minecraft/servers/${serverId}/plugins`);
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Failed to fetch plugins.');
-        }
-        const data: ServerPlugin[] = await response.json();
-        setPlugins(data);
-    } catch (err) {
-        const msg = err instanceof Error ? err.message : "An unknown error occurred while fetching plugins.";
-        toast({ title: "Error Loading Plugins", description: msg, variant: "destructive" });
-    } finally {
-        setIsLoadingPlugins(false);
-    }
-  }, [serverId, toast]);
-
   const handleTogglePlugin = async (plugin: ServerPlugin) => {
       if (!canManagePlugins) return;
       setPluginActionStates(prev => ({ ...prev, [plugin.fileName]: true }));
@@ -1031,10 +1043,10 @@ export default function EditServerPage() {
       <Tabs defaultValue="general" className="w-full">
         <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 mb-4 overflow-x-auto">
           <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="main-config" onClick={fetchConfig}>Config Editor</TabsTrigger>
-          <TabsTrigger value="file-manager" onClick={() => fetchFiles(currentFilePath)}>File Manager</TabsTrigger>
-          <TabsTrigger value="backups" onClick={fetchBackups}>Backups</TabsTrigger>
-          <TabsTrigger value="plugins" onClick={fetchPlugins}>Plugins</TabsTrigger>
+          <TabsTrigger value="main-config">Config Editor</TabsTrigger>
+          <TabsTrigger value="file-manager">File Manager</TabsTrigger>
+          <TabsTrigger value="backups">Backups</TabsTrigger>
+          <TabsTrigger value="plugins">Plugins</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general">
@@ -1617,7 +1629,7 @@ export default function EditServerPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Rename Item</DialogTitle>
-            <DialogDescription>Rename "{itemToRename?.name}" in <code>{itemToRename ? (itemToRename.path.substring(0, itemToRename.path.lastIndexOf(itemToRename.name)) || "/") : ""}</code></DialogDescription>
+            <DialogDescription>Rename "{itemToRename?.name}" in code>{itemToRename ? (itemToRename.path.substring(0, itemToRename.path.lastIndexOf(itemToRename.name)) || "/") : ""}</code></DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2">
             <Label htmlFor="newItemNameInput">New Name</Label>
@@ -1733,8 +1745,3 @@ export default function EditServerPage() {
     </div>
   );
 }
-    
-
-    
-
-    
