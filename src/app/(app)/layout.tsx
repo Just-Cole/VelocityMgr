@@ -71,6 +71,24 @@ const SidebarNavigationContent = () => {
     user?.permissions?.includes(item.requiredPermission)
   );
 
+  // This logic finds the nav item that is the "best" match for the current URL.
+  // The best match is the one with the longest href that is a prefix of the current path.
+  // This prevents both "Settings" and "Role Management" from being active at the same time.
+  const bestMatchHref = React.useMemo(() => {
+    let bestMatch = "";
+    if (!filteredNavItems) return bestMatch;
+
+    for (const item of filteredNavItems) {
+        if (pathname.startsWith(item.href)) {
+            if (item.href.length > bestMatch.length) {
+                bestMatch = item.href;
+            }
+        }
+    }
+    return bestMatch;
+  }, [pathname, filteredNavItems]);
+
+
   return (
     <>
       <SidebarHeader className="p-4">
@@ -87,7 +105,7 @@ const SidebarNavigationContent = () => {
             <SidebarMenuItem key={item.href}>
               <Link href={item.href}>
                 <SidebarMenuButton
-                  isActive={pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))}
+                  isActive={item.href === bestMatchHref}
                   tooltip={item.label}
                 >
                   <item.icon className="h-5 w-5" />
