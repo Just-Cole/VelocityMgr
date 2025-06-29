@@ -317,10 +317,6 @@ class IndexController {
                 servers[i].pid = undefined;
                 changesMade = true;
             }
-             if (servers[i].tags === undefined) {
-              servers[i].tags = [];
-              changesMade = true;
-            }
         }
         if (changesMade) {
             this._writeServers(servers);
@@ -524,7 +520,6 @@ class IndexController {
             cpuUsage: 0,
             ramUsage: 0,
             currentRam: 0,
-            tags: [],
         };
 
         try {
@@ -548,7 +543,7 @@ class IndexController {
             });
             tempExtractDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'modpack-'));
             console.log(`[Modrinth Create] Downloading ${serverFile.filename} to ${tempExtractDir}`);
-            const mrpackPath = await this.downloadFile(serverFile.url, tempExtractDir, serverFile.filename);
+            const mrpackPath = await this.downloadFile(tempExtractDir, tempExtractDir, serverFile.filename);
             await extract(mrpackPath, {
                 dir: tempExtractDir
             });
@@ -633,7 +628,6 @@ class IndexController {
                     status: 'Offline',
                     logoUrl: versionDetails.project?.icon_url || null,
                     consoleLogFile: consoleLogFilePath,
-                    tags: [],
                 };
                 finalServers[serverIndex] = finalServerData;
                 this._writeServers(finalServers);

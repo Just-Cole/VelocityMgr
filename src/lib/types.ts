@@ -43,7 +43,6 @@ export interface GameServer {
   maxPlayers?: number;
   connectedPlayers?: string[]; // Added for player list
   jarFileName?: string;
-  tags?: string[];
 }
 
 export interface BackendInstance {

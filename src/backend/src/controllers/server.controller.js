@@ -301,7 +301,6 @@ class ServerController {
                 minRam: this.indexController.config.default_min_ram || '1024M',
                 maxRam: this.indexController.config.default_max_ram || '2048M',
                 description: `A new ${serverType} server.`,
-                tags: [],
             };
     
             const serverFolderPath = this.indexController._getServerFolderPath(newServer);
@@ -362,7 +361,6 @@ class ServerController {
                         minRam: '1024M',
                         maxRam: '2048M',
                         description: 'Default Hub server for the network.',
-                        tags: ['hub'],
                     };
 
                     const hubFolderPath = this.indexController._getServerFolderPath(hubServer);
@@ -465,7 +463,6 @@ class ServerController {
                 description: description || 'An imported server.',
                 status: 'Offline',
                 connectedPlayers: [],
-                tags: ['imported'],
             };
 
             const serverFolderPath = this.indexController._getServerFolderPath(newServer);
@@ -608,9 +605,6 @@ class ServerController {
             serverToRestore.cpuUsage = 0;
             serverToRestore.ramUsage = 0;
             serverToRestore.currentRam = 0;
-            if (serverToRestore.tags === undefined) {
-              serverToRestore.tags = [];
-            }
 
 
             const originalPath = this.indexController._getServerFolderPath(serverToRestore);
@@ -1120,16 +1114,6 @@ class ServerController {
             const updatedServer = { ...originalServer,
                 ...updates
             };
-
-             // Explicitly handle tags to ensure it's an array
-            if (updates.tags !== undefined) {
-              if (Array.isArray(updates.tags)) {
-                updatedServer.tags = updates.tags;
-              } else {
-                // Handle cases where it might not be an array, though client should send one
-                updatedServer.tags = []; 
-              }
-            }
 
             // For non-proxy servers, update relevant properties in server.properties
             if (updates.port !== undefined && updates.port !== originalServer.port) {
