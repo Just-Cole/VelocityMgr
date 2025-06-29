@@ -98,11 +98,13 @@ enable-player-address-logging = true
 [servers]
 # Configure your servers here. Each key represents the server's name, and the value
 # represents the IP address of the server to connect to.
-try = []
+# This is a sample entry. The system will automatically add new servers here.
+Hub = "127.0.0.1:25566"
+try = ["Hub"]
 
 [forced-hosts]
 # Configure your forced hosts here.
-# "lobby.example.com" = ["lobby"]
+# "lobby.example.com" = ["Hub"]
 
 [forwarding]
 # Should we forward IP addresses and other data to backend servers?
@@ -223,7 +225,7 @@ class ServerController {
             if (!parsedToml.servers) parsedToml.servers = {};
             if (!parsedToml.forwarding) parsedToml.forwarding = {};
 
-            const serverEntryName = serverToAdd.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const serverEntryName = this.indexController.sanitize(serverToAdd.name);
             const serverAddress = `${serverToAdd.ip}:${serverToAdd.port}`;
 
             parsedToml.servers[serverEntryName] = serverAddress;
@@ -1318,5 +1320,6 @@ module.exports = ServerController;
     
 
     
+
 
 
