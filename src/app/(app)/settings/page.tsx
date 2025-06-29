@@ -5,121 +5,80 @@ import * as React from "react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
-import { Save, Palette, BellDot } from "lucide-react";
+import { useTheme } from "@/contexts/ThemeContext";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { cn } from "@/lib/utils";
+import { Palette } from "lucide-react";
 
 export default function SettingsPage() {
-  const { toast } = useToast();
-
-  // Appearance States
-  const [darkMode, setDarkMode] = React.useState(true); 
-
-  // Notifications States
-  const [globalNotifications, setGlobalNotifications] = React.useState(true);
-  const [serverStatusAlerts, setServerStatusAlerts] = React.useState(true);
-  const [backupCompletionAlerts, setBackupCompletionAlerts] = React.useState(false);
-  const [emailNotifications, setEmailNotifications] = React.useState(false);
-  const [notificationEmail, setNotificationEmail] = React.useState("user@example.com");
-
-  const handleSaveChanges = () => {
-    console.log("Settings saved:", { 
-      darkMode,
-      globalNotifications, serverStatusAlerts, backupCompletionAlerts, emailNotifications, notificationEmail,
-    });
-    toast({
-      title: "Settings Saved",
-      description: "Your preferences have been updated.",
-    });
-  };
+  const { theme, setTheme } = useTheme();
 
   return (
     <div className="container mx-auto py-2">
       <PageHeader title="Application Settings" description="Manage your preferences and application configuration." />
 
-      <div className="grid gap-8 md:grid-cols-1 lg:grid-cols-2">
-        
-        <Card className="col-span-1 lg:col-span-2">
+      <div className="grid gap-8">
+        <Card>
           <CardHeader>
             <CardTitle className="font-headline flex items-center gap-2"><Palette /> Appearance</CardTitle>
-            <CardDescription>Customize the look and feel of the application.</CardDescription>
+            <CardDescription>Customize the look and feel of the application by selecting a theme.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <Label htmlFor="dark-mode" className="flex flex-col space-y-1">
-                <span>Dark Mode</span>
-                <span className="font-normal leading-snug text-muted-foreground">
-                  Toggle dark theme for the application.
-                </span>
-              </Label>
-              <Switch
-                id="dark-mode"
-                checked={darkMode}
-                onCheckedChange={setDarkMode}
-                aria-label="Toggle dark mode"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="col-span-1 lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="font-headline flex items-center gap-2"><BellDot /> Notifications</CardTitle>
-            <CardDescription>Manage how you receive notifications from the application.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <Label htmlFor="global-notifications" className="flex flex-col space-y-1">
-                <span>Enable All App Notifications</span>
-                <span className="font-normal leading-snug text-muted-foreground">
-                  Master switch for in-app notifications.
-                </span>
-              </Label>
-              <Switch
-                id="global-notifications"
-                checked={globalNotifications}
-                onCheckedChange={setGlobalNotifications}
-              />
-            </div>
-            <div className="space-y-4 p-4 border rounded-lg">
-              <h4 className="font-medium text-sm">Specific Alerts (if global enabled):</h4>
-              <div className="flex items-center justify-between pl-4">
-                <Label htmlFor="server-status-alerts" className="text-sm font-normal">Server Online/Offline Alerts</Label>
-                <Switch id="server-status-alerts" checked={serverStatusAlerts} onCheckedChange={setServerStatusAlerts} disabled={!globalNotifications}/>
-              </div>
-              <div className="flex items-center justify-between pl-4">
-                <Label htmlFor="backup-alerts" className="text-sm font-normal">Backup Completion/Failure Alerts</Label>
-                <Switch id="backup-alerts" checked={backupCompletionAlerts} onCheckedChange={setBackupCompletionAlerts} disabled={!globalNotifications}/>
-              </div>
-            </div>
-             <div className="space-y-4 p-4 border rounded-lg">
-                <div className="flex items-center justify-between">
-                    <Label htmlFor="email-notifications" className="flex flex-col space-y-1">
-                        <span>Enable Email Notifications</span>
-                        <span className="font-normal leading-snug text-muted-foreground">
-                        Receive important updates via email.
-                        </span>
-                    </Label>
-                    <Switch id="email-notifications" checked={emailNotifications} onCheckedChange={setEmailNotifications} />
-                </div>
-                {emailNotifications && (
-                    <div>
-                        <Label htmlFor="notification-email">Notification Email Address</Label>
-                        <Input id="notification-email" type="email" value={notificationEmail} onChange={(e) => setNotificationEmail(e.target.value)} className="mt-1" placeholder="your@email.com" />
+          <CardContent>
+             <RadioGroup
+              value={theme}
+              onValueChange={setTheme}
+              className="grid max-w-md grid-cols-1 gap-8 pt-2 sm:grid-cols-3"
+            >
+              <Label className={cn("cursor-pointer rounded-md border-2 p-1 transition-colors", theme === 'light' ? 'border-primary' : 'border-muted hover:border-accent')}>
+                <RadioGroupItem value="light" className="sr-only" />
+                <div className="items-center rounded-md bg-[#ecedef] p-2">
+                  <div className="space-y-2 rounded-sm p-2">
+                    <div className="space-y-2 rounded-md bg-white p-2 shadow-sm">
+                      <div className="h-2 w-4/5 rounded-lg bg-[#ecedef]" />
+                      <div className="h-2 w-full rounded-lg bg-[#ecedef]" />
                     </div>
-                )}
-             </div>
+                    <div className="flex items-center space-x-2 rounded-md bg-white p-2 shadow-sm">
+                      <div className="h-4 w-4 rounded-full bg-[#ecedef]" />
+                      <div className="h-2 w-full rounded-lg bg-[#ecedef]" />
+                    </div>
+                  </div>
+                </div>
+                <span className="block w-full p-2 text-center font-normal">
+                  Light
+                </span>
+              </Label>
+              <Label className={cn("cursor-pointer rounded-md border-2 p-1 transition-colors", theme === 'dark' ? 'border-primary' : 'border-muted hover:border-accent')}>
+                <RadioGroupItem value="dark" className="sr-only" />
+                 <div className="items-center rounded-md bg-slate-900 p-2">
+                    <div className="space-y-2 rounded-sm bg-slate-800 p-2">
+                      <div className="space-y-2 rounded-md bg-slate-700 p-2 shadow-sm">
+                        <div className="h-2 w-4/5 rounded-lg bg-slate-400" />
+                        <div className="h-2 w-full rounded-lg bg-slate-400" />
+                      </div>
+                      <div className="flex items-center space-x-2 rounded-md bg-slate-700 p-2 shadow-sm">
+                        <div className="h-4 w-4 rounded-full bg-slate-400" />
+                        <div className="h-2 w-full rounded-lg bg-slate-400" />
+                      </div>
+                    </div>
+                  </div>
+                <span className="block w-full p-2 text-center font-normal">
+                  Dark
+                </span>
+              </Label>
+               <Label className={cn("cursor-pointer rounded-md border-2 p-1 transition-colors", theme === 'system' ? 'border-primary' : 'border-muted hover:border-accent')}>
+                <RadioGroupItem value="system" className="sr-only" />
+                 <div className="items-center rounded-md border-2 border-dashed bg-background p-1">
+                    <div className="flex h-[98px] w-full items-center justify-center">
+                        <span className="font-semibold text-muted-foreground">System</span>
+                    </div>
+                  </div>
+                <span className="block w-full p-2 text-center font-normal">
+                  System
+                </span>
+              </Label>
+            </RadioGroup>
           </CardContent>
         </Card>
-        
-      </div>
-
-      <div className="mt-12 flex justify-end border-t pt-6">
-        <Button onClick={handleSaveChanges} size="lg">
-          <Save className="mr-2 h-5 w-5" /> Save All Settings
-        </Button>
       </div>
     </div>
   );
