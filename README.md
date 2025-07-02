@@ -71,6 +71,17 @@ Velocity Manager will operate on a **Freemium model**, providing essential tools
 
 For large-scale server networks or commercial hosting providers, a custom **Enterprise** plan will be available, offering features like API access for automation, dedicated support with SLAs, and potential white-labeling options.
 
+## ❤️ Supporting Mod Authors
+
+We believe that mod authors are the lifeblood of the Minecraft community, and supporting them is a top priority. Velocity Manager is designed to respect their work and contribute positively to the ecosystem.
+
+*   **No Re-hosting:** We **do not** re-host or redistribute modpacks or individual mods. All downloads are fetched directly from official sources like Modrinth using their public APIs.
+*   **Counting Downloads:** By fetching directly from the source, we ensure that every download through Velocity Manager correctly increments the author's download count on their platform, which often contributes to their revenue and visibility.
+*   **Driving Support:** We will always display the author's name and provide prominent links back to the original Modrinth/CurseForge page, encouraging users to support them directly through donations, Patreon, or other methods they provide.
+*   **Respecting Licenses:** We operate strictly within the Terms of Service of the platforms we interact with and respect the licenses chosen by mod authors for their work.
+
+Our business model is based on providing a powerful management tool, not on profiting from the distribution of others' work. Our goal is to make it easier for players to enjoy modded Minecraft while ensuring the creators receive the credit and support they deserve.
+
 ## 🏁 Getting Started
 
 Follow these instructions to get a copy of the project up and running on your local machine for development and testing purposes.
