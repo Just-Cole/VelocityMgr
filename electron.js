@@ -46,8 +46,8 @@ function startBackend() {
 }
 
 function startFrontendProd() {
-    const nextCliPath = path.join(__dirname, 'node_modules', '.bin', 'next');
-    // Pass the backend port to the Next.js process as an environment variable
+    // Use the direct path to the Next.js CLI script for reliability in packaged apps
+    const nextCliPath = path.join(__dirname, 'node_modules', 'next', 'dist', 'bin', 'next');
     const env = { ...process.env, BACKEND_PORT: backendPort }; 
     
     frontendProcess = fork(nextCliPath, ['start', '-p', frontendPort], {

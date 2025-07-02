@@ -102,14 +102,27 @@
     "appId": "com.velocitymanager.app",
     "productName": "VelocityManager",
     "copyright": "Copyright 2025 Velocity Manager Team",
-    "files": [
-      "public/**/*",
-      ".next/**/*",
-      "electron.js",
-      "src/backend/src/**/*",
-      "config.json",
-      "next.config.ts",
-      "package.json"
+    "extraResources": [
+      {
+        "from": ".next",
+        "to": ".next"
+      },
+      {
+        "from": "public",
+        "to": "public"
+      },
+      {
+        "from": "src/backend/src",
+        "to": "src/backend/src"
+      },
+      {
+        "from": "config.json",
+        "to": "config.json"
+      },
+      {
+        "from": "next.config.ts",
+        "to": "next.config.ts"
+      }
     ],
     "directories": {
       "output": "release"
