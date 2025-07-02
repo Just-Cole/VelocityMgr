@@ -122,6 +122,26 @@ This will:
 
 Once both servers are running, open your browser and navigate to the frontend URL displayed in the terminal.
 
+### Running in Production Mode
+
+To run the application in a production-like environment suitable for a web server, you first need to build the Next.js frontend:
+
+```bash
+npm run build
+```
+
+Then, you can start both the production frontend server and the backend API server using a single command:
+
+```bash
+npm start
+```
+
+This will:
+*   Start the **Backend API Server** (typically on `http://localhost:3005`).
+*   Start the **Optimized Production Frontend Server** (typically on `http://localhost:9002`).
+
+This setup is ideal for deployment on a server where you would use a process manager like PM2 to keep the application running.
+
 ### Running in Desktop (Electron) Mode
 
 This mode simulates the packaged desktop application. It's useful for testing desktop-specific functionality.
