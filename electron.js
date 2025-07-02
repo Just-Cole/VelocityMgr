@@ -14,7 +14,7 @@ let backendProcess;
 let frontendProcess;
 
 // Load config.json to get ports
-let config = { backend_port: 3005, frontend_port: 9002 };
+let config = { backend_port: 9002, frontend_port: 9000 };
 const configPath = path.resolve(__dirname, 'config.json');
 if (fs.existsSync(configPath)) {
     try {
@@ -24,8 +24,8 @@ if (fs.existsSync(configPath)) {
     }
 }
 
-const frontendPort = config.frontend_port || 9002;
-const backendPort = config.backend_port || 3005;
+const frontendPort = config.frontend_port || 9000;
+const backendPort = config.backend_port || 9002;
 
 function startBackend() {
   const backendPath = path.join(__dirname, 'src', 'backend', 'src', 'index.js');

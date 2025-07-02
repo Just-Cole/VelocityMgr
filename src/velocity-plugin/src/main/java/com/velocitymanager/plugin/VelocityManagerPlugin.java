@@ -49,7 +49,7 @@ public class VelocityManagerPlugin {
     public VelocityManagerPlugin(ProxyServer server, Logger logger) {
         this.server = server;
         this.logger = logger;
-        this.apiService = new ApiService("http://127.0.0.1:3005/api");
+        this.apiService = new ApiService("http://127.0.0.1:9002/api");
         logger.info("VelocityManagerPlugin has been loaded!");
     }
 

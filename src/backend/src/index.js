@@ -24,8 +24,8 @@ const createApiRouter = require('./routes/index.js');
 const apiRouter = createApiRouter(config);
 
 const app = express();
-// Use a specific environment variable for the backend port, or config.json, defaulting to 3005
-const port = parseInt(process.env.BACKEND_PORT, 10) || config.backend_port || 3005;
+// Use a specific environment variable for the backend port, or config.json, defaulting to 9002
+const port = parseInt(process.env.BACKEND_PORT, 10) || config.backend_port || 9002;
 const hostname = '0.0.0.0'; 
 
 app.use(cors());

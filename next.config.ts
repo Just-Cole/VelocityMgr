@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 // Load config.json
-let config = { backend_port: 3005 };
+let config = { backend_port: 9002 };
 const configPath = path.resolve(process.cwd(), 'config.json');
 if (fs.existsSync(configPath)) {
     try {
@@ -62,7 +62,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  allowedDevOrigins: ["http://localhost:3000", "http://localhost:3005", "https://*.cloudworkstations.dev"],
+  allowedDevOrigins: ["http://localhost:3000", "http://localhost:9002", "https://*.cloudworkstations.dev"],
 };
 
 export default nextConfig;

@@ -117,8 +117,8 @@ npm run dev
 ```
 
 This will:
-*   Start the **Backend API Server** (typically on `http://localhost:3005`).
-*   Start the **Frontend Development Server** (typically on `http://localhost:9002`).
+*   Start the **Backend API Server** (typically on `http://localhost:9002`).
+*   Start the **Frontend Development Server** (typically on `http://localhost:9000`).
 
 Once both servers are running, open your browser and navigate to the frontend URL displayed in the terminal.
 
@@ -137,8 +137,8 @@ npm start
 ```
 
 This will:
-*   Start the **Backend API Server** (typically on `http://localhost:3005`).
-*   Start the **Optimized Production Frontend Server** (typically on `http://localhost:9002`).
+*   Start the **Backend API Server** (typically on `http://localhost:9002`).
+*   Start the **Optimized Production Frontend Server** (typically on `http://localhost:9000`).
 
 This setup is ideal for deployment on a server where you would use a process manager like PM2 to keep the application running.
 

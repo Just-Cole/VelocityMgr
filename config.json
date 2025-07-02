@@ -1,6 +1,6 @@
 {
-  "backend_port": 3005,
-  "frontend_port": 9002,
+  "backend_port": 9002,
+  "frontend_port": 9000,
   "java_executable_path": "java",
   "default_min_ram": "1024M",
   "default_max_ram": "2048M",

@@ -20,7 +20,7 @@ export async function analyzeServerLogs(
       return { error: validatedInput.error.errors.map(e => e.message).join(", ") };
     }
     
-    const backendPort = process.env.BACKEND_PORT || 3005;
+    const backendPort = process.env.BACKEND_PORT || 9002;
     const apiUrl = `http://localhost:${backendPort}/api`;
 
     // Fetch the full log content from the backend API
