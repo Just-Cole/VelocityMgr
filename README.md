@@ -8,7 +8,7 @@ Velocity Manager is a comprehensive, web-based application designed to simplify 
 *   **Network Dashboard:** Get a high-level overview of all your game servers, their online status, current player counts, and aggregate resource usage (CPU & RAM).
 *   **Server Creation & Setup:**
     *   **Single Server:** Easily create a standalone PaperMC or Velocity instance.
-    *   **Proxy Network:** Create a Velocity proxy, optionally with a companion "Hub" server. New proxies are created using a standard template for consistency.
+    *   **Proxy Network:** Create a Velocity proxy. New proxies are created using a standard template for consistency.
     *   **Modpack Installation:** Search for and install server packs directly from Modrinth. Includes an AI assistant to suggest optimal RAM allocation based on the modpack's description.
     *   **Upload Existing Server:** Migrate an existing server by simply uploading its contents in a `.zip` file.
 *   **Server Management:**
@@ -20,7 +20,7 @@ Velocity Manager is a comprehensive, web-based application designed to simplify 
     *   **Server Actions:** Start, Stop, and Restart servers directly from the dashboard or management page.
 *   **Server Configuration:**
     *   **General Settings:** Easily modify server name, port, description, RAM allocation, custom Java launch arguments, and tags.
-    *   **File Manager & Editors:** A full-featured file browser to view, edit, upload, and manage files. Includes a user-friendly editor for `server.properties`.
+    *   **File Manager & Editors:** A full-featured file browser to view, edit, upload, and manage files. Includes user-friendly editors for configuration files.
     *   **Backup Management:** Create on-demand backups, restore a server to a previous state, download, or delete old backups.
     *   **Plugin Management:**
         *   List installed plugins and toggle their enabled/disabled state.
@@ -48,6 +48,28 @@ Velocity Manager is a comprehensive, web-based application designed to simplify 
 *   **Desktop Packaging:**
     *   Electron
     *   Electron Builder
+
+## 💼 Business Model
+
+Velocity Manager will operate on a **Freemium model**, providing essential tools for free while offering advanced, high-value features for paid users. This approach supports both hobbyist server owners and larger communities or businesses.
+
+### Tiers
+
+| Feature                      | Community Edition (Free)                                  | Pro Edition (Paid)                                         |
+| ---------------------------- | --------------------------------------------------------- | ---------------------------------------------------------- |
+| **Server Limit**             | Up to 3 servers                                           | ✅ **Unlimited servers**                                     |
+| **Core Management**          | ✅ Start, Stop, Console, Player List, File Manager        | ✅ All core features                                       |
+| **User Management**          | Basic (Admin, Operator, etc.)                             | ✅ **Full RBAC (custom roles & permissions)**              |
+| **Backups**                  | Manual on-demand backups                                  | ✅ **Automated & Scheduled Backups**                       |
+| **AI Log Diagnostics**       | ❌                                                        | ✅ **Unlimited analysis**                                  |
+| **AI RAM Advisor**           | ❌                                                        | ✅ **Unlimited suggestions**                               |
+| **AI Config Advisor**        | ❌                                                        | ✅ **Advanced configuration suggestions**                    |
+| **One-Click Installers**     | ✅ Spigot Plugins                                         | ✅ **Modrinth Modpacks & Spigot Plugins**                    |
+| **Priority Support**         | Community Support                                         | ✅ **Email & Discord Priority Support**                      |
+
+### Enterprise
+
+For large-scale server networks or commercial hosting providers, a custom **Enterprise** plan will be available, offering features like API access for automation, dedicated support with SLAs, and potential white-labeling options.
 
 ## 🏁 Getting Started
 
