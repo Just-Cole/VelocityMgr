@@ -8,7 +8,7 @@ Velocity Manager is a comprehensive, web-based application designed to simplify 
 *   **Network Dashboard:** Get a high-level overview of all your game servers, their online status, current player counts, and aggregate resource usage (CPU & RAM).
 *   **Server Creation & Setup:**
     *   **Single Server:** Easily create a standalone PaperMC or Velocity instance.
-    *   **Proxy Network:** Automatically set up a Velocity proxy complete with a backend "Hub" server, with secure forwarding configured out-of-the-box.
+    *   **Proxy Network:** Create a Velocity proxy, optionally with a companion "Hub" server. New proxies are created using a standard template for consistency.
     *   **Modpack Installation:** Search for and install server packs directly from Modrinth. Includes an AI assistant to suggest optimal RAM allocation based on the modpack's description.
     *   **Upload Existing Server:** Migrate an existing server by simply uploading its contents in a `.zip` file.
 *   **Server Management:**
@@ -20,8 +20,7 @@ Velocity Manager is a comprehensive, web-based application designed to simplify 
     *   **Server Actions:** Start, Stop, and Restart servers directly from the dashboard or management page.
 *   **Server Configuration:**
     *   **General Settings:** Easily modify server name, port, description, RAM allocation, custom Java launch arguments, and tags.
-    *   **Structured Config Editor:** A user-friendly, form-based editor for `server.properties` (PaperMC) and `velocity.toml` (Velocity) files, preventing syntax errors.
-    *   **File Manager:** A full-featured file browser to view, edit, upload, create folders, rename, and delete files/folders within a server's directory.
+    *   **File Manager & Editors:** A full-featured file browser to view, edit, upload, and manage files. Includes a user-friendly editor for `server.properties`.
     *   **Backup Management:** Create on-demand backups, restore a server to a previous state, download, or delete old backups.
     *   **Plugin Management:**
         *   List installed plugins and toggle their enabled/disabled state.
